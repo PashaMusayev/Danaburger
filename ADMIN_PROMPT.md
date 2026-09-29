@@ -6,7 +6,7 @@
 
 ## ROL
 
-Sən senior Full-Stack Developer və UX dizaynersən. Mövcud **Dana Burger** saytına (bu repozitoriya) restoran sahibi üçün admin panel əlavə et. Sahib texniki adam deyil və paneldən əsasən **telefonda** istifadə edəcək. Hədəf: sahib 30 saniyəyə qiyməti dəyişə, məhsulu əlavə edə və ya silə bilsin, heç vaxt koda toxunmasın.
+Sən senior Full-Stack Developer və UX dizaynersən. Mövcud **Dana Burger** saytına (bu repozitoriya) restoran sahibi üçün admin panel əlavə et. Sahib texniki adam deyil və paneldən **həm kompüterdə, həm telefonda** istifadə edəcək. Əsas redaktə işləri (çoxlu qiymət dəyişikliyi, yeni məhsullar, fotolar) kompüterdə, tez işlər ("bitib" etmək, bir qiyməti düzəltmək) telefonda görüləcək. Hədəf: sahib 30 saniyəyə qiyməti dəyişə, məhsulu əlavə edə və ya silə bilsin, heç vaxt koda toxunmasın.
 
 ## MÖVCUD VƏZİYYƏT (əvvəlcə oxu)
 
@@ -43,7 +43,12 @@ Verilənlər bazası **yoxdur**. Admin panel dəyişiklikləri **GitHub API vasi
 - Məhsullar kateqoriyalara görə qruplaşsın. Üstdə axtarış olsun (saytdakı kimi ə/ş/ç-ni tanıyan).
 - Hər sətirdə: kiçik foto, ad, qiymət, **"Mövcuddur / Bitib"** açarı və redaktə düyməsi.
   - "Bitib" = `available: false`. Məhsul saytdan gizlənir, amma silinmir. Bu, gündəlik ən çox istifadə olunacaq funksiyadır.
-- **Qiyməti birbaşa siyahıda dəyişmək** mümkün olsun: qiymətə toxun, rəqəm klaviaturası açılsın (`inputmode="decimal"`), yaz və təsdiqlə.
+- **Qiyməti birbaşa siyahıda dəyişmək** mümkün olsun: qiymətə klik et və ya toxun, yaz, Enter ilə təsdiqlə. Telefonda rəqəm klaviaturası açılsın (`inputmode="decimal"`).
+- **Kompüterdə cədvəl görünüşü** olsun. Sütunlar: foto, ad, kateqoriya, qiymət, köhnə qiymət, mövcudluq, əməliyyatlar.
+  - Qiymət xanaları arasında **Tab / Enter / ↑ ↓** ilə keçmək mümkün olsun ki, bütün menyunun qiymətini Excel kimi ardıcıl dəyişmək olsun.
+  - Sütunlara görə sıralama və kateqoriya filtri olsun.
+- **Toplu əməliyyatlar** (kompüterdə): bir neçə məhsulu checkbox ilə seçib bir dəfəyə "bitib et / mövcud et", "kateqoriyanı dəyiş", "sil" etmək mümkün olsun.
+- **Toplu qiymət dəyişikliyi**: seçilmiş məhsullara və ya bütün kateqoriyaya "+0.50 ₼" və ya "+10%" tətbiq et. Əvvəlcə köhnə → yeni qiymətləri önizləmə kimi göstər, sonra təsdiq istə.
 
 ### 2. Məhsul əlavə et / redaktə et
 - Sahələr:
@@ -51,7 +56,7 @@ Verilənlər bazası **yoxdur**. Admin panel dəyişiklikləri **GitHub API vasi
   - Ad: **AZ məcburidir**, RU və EN istəyə bağlıdır. Boş qalsa, saytda AZ ad göstərilsin.
   - Tərkib, qiymət, köhnə qiymət (endirim üçün), etiketlər (populyar / yeni / acılı / toyuq / ət / vegetarian)
 - `id` AZ addan avtomatik yaransın (slug: "Çizburger" → `cizburger`) və unikal olsun. Mövcud məhsulun `id`-si heç vaxt dəyişməsin, çünki kombo `includes` və müştəri səbətləri ona istinad edir.
-- **Foto yükləmə**: telefonun kamerası və ya qalereyası ilə.
+- **Foto yükləmə**: kompüterdə faylı sürükləyib atmaqla və ya fayl seçməklə, telefonda kamera və ya qalereya ilə.
   - Brauzerdə 1200 px-ə qədər kiçildilib WebP-yə çevrilsin (hədəf ≤ 150 KB).
   - `public/img/`-ə commit olunsun.
 - **Canlı önizləmə**: kartın saytda necə görünəcəyi yanında göstərilsin.
@@ -62,7 +67,7 @@ Verilənlər bazası **yoxdur**. Admin panel dəyişiklikləri **GitHub API vasi
 - Məhsul kombo `includes`-də istifadə olunursa, xəbərdarlıq et və hansı kombolarda olduğunu göstər. Silməyi bloklama, amma həmin kombolardan onun istinadını da təmizlə.
 
 ### 4. Sıralama
-- Kateqoriya daxilində məhsulları yuxarı/aşağı hərəkət etdirmək mümkün olsun. Telefonda sürükləmə çətin olduğu üçün **↑ ↓ düymələri** qoy.
+- Kateqoriya daxilində məhsulları yuxarı/aşağı hərəkət etdirmək mümkün olsun. Kompüterdə **sürüklə-burax** işləsin. Telefonda sürükləmə çətin olduğu üçün **↑ ↓ düymələri** olsun.
 
 ### 5. Validasiya (həm brauzerdə, həm serverdə)
 - Qiymət > 0 olsun, ən çox 2 onluq rəqəm. Vergül də qəbul olunsun: "5,80" → 5.80.
@@ -89,7 +94,10 @@ Verilənlər bazası **yoxdur**. Admin panel dəyişiklikləri **GitHub API vasi
 ## UX
 
 - Admin panelin dili **Azərbaycan dili** olsun. Sahib üçün RU/EN interfeys lazım deyil.
-- **Mobile-first**, 375 px-dən başla. Düymələr ən az 44 px olsun, əsas düymələr barmağın çatdığı aşağı hissədə yerləşsin.
+- **Həm kompüter, həm telefon** üçün tam işlək olsun. Hər ekranı hər iki ölçüdə yoxla: 1440 px və 375 px.
+  - **Kompüterdə** yan menyu (Menyu / Tarixçə / Ayarlar) və geniş cədvəl olsun. Məhsul redaktəsi ayrı səhifəyə keçmədən sağ paneldə açılsın.
+  - **Klaviatura qısayolları**: `/` axtarış, `N` yeni məhsul, `Ctrl/Cmd+S` qaralamanı yadda saxla, `Esc` paneli bağla.
+  - **Telefonda** cədvəl kart siyahısına çevrilsin. Düymələr ən az 44 px olsun, əsas düymələr barmağın çatdığı aşağı hissədə yerləşsin.
 - Saytın brend stilində olsun: qara fon, qırmızı/qızılı rənglər. Amma formalar sadə və aydın olsun.
 - Hər əməliyyatdan sonra aydın bildiriş göstər: "Yadda saxlanıldı", "Yayımlandı", xəta olsa nə etmək lazım olduğu.
 - Boş vəziyyətlər, yüklənmə göstəriciləri və şəbəkə xətası mesajları insan dilində yazılsın, texniki terminlərsiz.
@@ -103,14 +111,15 @@ Verilənlər bazası **yoxdur**. Admin panel dəyişiklikləri **GitHub API vasi
 ## TESTLƏR
 
 - Validasiya, slug yaradılması və `menu.json` formatlaşdırması üçün unit testlər.
-- GitHub API mock edilməklə e2e testi: login → qiymət dəyiş → bitib et → yeni məhsul (foto ilə) → yayımla → commit məzmununu yoxla → tarixçədən geri qaytar.
+- GitHub API mock edilməklə e2e testi, **həm 1440 px, həm 375 px ölçüsündə**: login → qiymət dəyiş → bitib et → yeni məhsul (foto ilə) → yayımla → commit məzmununu yoxla → tarixçədən geri qaytar.
+- Kompüter üçün əlavə e2e testi: cədvəldə Tab/Enter ilə bir neçə qiyməti ardıcıl dəyiş, toplu "+10%" tətbiq et və önizləmədəki rəqəmlərin düzgün olduğunu yoxla.
 - Səhv parol, rate limit və sessiyasız API çağırışı üçün testlər.
 - Build-dən sonra ictimai səhifələrin hələ də statik olduğunu yoxla.
 
 ## ÇATDIRILACAQLAR
 
 1. İşlək kod və testlər
-2. **Sahib üçün Azərbaycan dilində qısa təlimat** (`ADMIN.md`): necə daxil olmaq, qiymət dəyişmək, "bitib" etmək, məhsul əlavə etmək, geri qaytarmaq
+2. **Sahib üçün Azərbaycan dilində qısa təlimat** (`ADMIN.md`): necə daxil olmaq, qiymət dəyişmək (tək-tək və toplu), "bitib" etmək, məhsul əlavə etmək, geri qaytarmaq. Kompüter və telefon üçün ayrıca qısa bölmə olsun.
 3. **Qurulma təlimatı**: GitHub fine-grained token-in addım-addım yaradılması, Vercel-də env dəyişənlərinin əlavə edilməsi, parol hash-inin yaradılması
 
 ## İŞ QAYDASI
