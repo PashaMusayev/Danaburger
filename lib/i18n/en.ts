@@ -30,6 +30,14 @@ const en: Dict = {
     add: 'Add to cart',
     all: 'All sets',
   },
+  breakfast: {
+    kicker: 'Start the day right',
+    title: 'Breakfast',
+    for1: 'for 1',
+    for2: 'for 2',
+    add: 'Add to cart',
+    more: 'See what’s inside',
+  },
   menu: {
     kicker: 'Menu',
     title: 'What are we eating today?',

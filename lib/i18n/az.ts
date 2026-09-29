@@ -28,6 +28,14 @@ const az = {
     add: 'Səbətə at',
     all: 'Bütün setlər',
   },
+  breakfast: {
+    kicker: 'Günə dadlı başla',
+    title: 'Səhər yeməyi',
+    for1: '1 nəfərlik',
+    for2: '2 nəfərlik',
+    add: 'Səbətə at',
+    more: 'Tərkibinə bax',
+  },
   menu: {
     kicker: 'Menyu',
     title: 'Nə yeyirik bu gün?',

@@ -1,6 +1,7 @@
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import Deals from '@/components/Deals';
+import Breakfast from '@/components/Breakfast';
 import Menu from '@/components/Menu';
 import WhyUs from '@/components/WhyUs';
 import Gallery from '@/components/Gallery';
@@ -18,6 +19,7 @@ export default async function Home() {
       <main>
         <Hero />
         <Deals />
+        <Breakfast />
         <Menu />
         <WhyUs />
         <Gallery />
