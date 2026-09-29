@@ -1,8 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { RawMenuItem } from '@/lib/menu';
-import { applyBulkPrices, deleteItems, moveItem, placeItem, previewBulk, updateItem, usedInCombos } from '@/lib/admin/ops';
+import type { BranchEntry, CatalogItem } from '@/lib/menu';
+import {
+  applyBulkPrices,
+  deleteProducts,
+  moveEntry,
+  placeEntry,
+  previewBulk,
+  setSold,
+  soldAt,
+  updateCatalogItem,
+  updateEntry,
+  usedInCombos,
+} from '@/lib/admin/ops';
+import { branchName, type AdminData } from '@/lib/admin/model';
+import { parsePrice } from '@/lib/admin/price';
 import { searchNorm } from '@/lib/admin/slug';
 import type { BulkOp } from '@/lib/admin/price';
 import { useAdmin } from './AdminStore';
@@ -12,8 +25,49 @@ import { Dialog, Switch, btn, input, inputBase, isTyping } from './ui';
 
 type SortKey = 'default' | 'name' | 'category' | 'price' | 'available';
 
+/** A product as it is at the selected branch: shared catalog data + that branch's price line. */
+export type Row = CatalogItem & Omit<BranchEntry, 'description'>;
+
+/** The selected branch's items in its own order (the order the site shows them in). */
+function branchRows(d: AdminData, branch: string): Row[] {
+  const cat = new Map(d.catalog.items.map((i) => [i.id, i]));
+  return (d.menus[branch]?.items ?? []).flatMap((e) => {
+    const c = cat.get(e.id);
+    if (!c) return [];
+    const { description, ...entry } = e;
+    return [{ ...c, ...entry, description: description ?? c.description }];
+  });
+}
+
+export function BranchTabs() {
+  const { data, branch, setBranch } = useAdmin();
+  return (
+    <div className="flex overflow-x-auto rounded-2xl border border-white/10 p-1" role="tablist" aria-label="Filial">
+      {data.branches.branches.map((b) => (
+        <button
+          key={b.id}
+          role="tab"
+          aria-selected={branch === b.id}
+          onClick={() => setBranch(b.id)}
+          className={`min-h-10 shrink-0 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition ${branch === b.id ? 'bg-gold text-ink' : 'text-mute hover:text-cream'}`}
+        >
+          📍 {b.name.az}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function MenuScreen() {
-  const { menu, base, setMenu, confirm, toast, srcFor } = useAdmin();
+  const { data, base, update, branch, confirm, toast, srcFor } = useAdmin();
+  const bn = branchName(data, branch);
+  const menu = useMemo(() => ({ categories: data.catalog.categories, items: branchRows(data, branch) }), [data, branch]);
+  const [showNotSold, setShowNotSold] = useState(false);
+  const notSold = useMemo(() => {
+    const here = new Set(data.menus[branch]?.items.map((e) => e.id));
+    return data.catalog.items.filter((i) => !here.has(i.id));
+  }, [data, branch]);
+  const [adding, setAdding] = useState<CatalogItem | null>(null);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'default', dir: 1 });
@@ -23,7 +77,10 @@ export default function MenuScreen() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const catName = useMemo(() => new Map(menu.categories.map((c) => [c.id, c])), [menu.categories]);
-  const baseById = useMemo(() => new Map(base?.menu.items.map((i) => [i.id, i]) ?? []), [base]);
+  const baseById = useMemo(() => new Map(base ? branchRows(base.data, branch).map((i) => [i.id, i]) : []), [base, branch]);
+
+  // switching branch clears the selection (it belonged to the other branch's rows)
+  useEffect(() => setSelected(new Set()), [branch]);
 
   const rows = useMemo(() => {
     const nq = searchNorm(q.trim());
@@ -36,7 +93,7 @@ export default function MenuScreen() {
       const order = new Map(menu.categories.map((c, n) => [c.id, n]));
       list = [...list].sort((a, b) => order.get(a.category)! - order.get(b.category)!); // stable: keeps order within a category
     } else {
-      const val = (i: RawMenuItem) =>
+      const val = (i: Row) =>
         sort.key === 'name' ? i.name.az.toLocaleLowerCase('az') : sort.key === 'category' ? catName.get(i.category)?.name.az ?? '' : sort.key === 'price' ? i.price : Number(i.available);
       list = [...list].sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * sort.dir);
     }
@@ -45,33 +102,64 @@ export default function MenuScreen() {
 
   const canReorder = sort.key === 'default' && !q.trim();
 
-  const askDelete = useCallback(
+  const combosWarning = (ids: string[]) => {
+    const combos = [...new Map(ids.flatMap((id) => usedInCombos(data, id)).filter((c) => !ids.includes(c.id)).map((c) => [c.id, c])).values()];
+    return combos.length > 0 ? (
+      <p className="mt-3 rounded-xl bg-gold/10 p-3 text-sm text-gold">
+        ⚠ Bu setlərin tərkibində istifadə olunur: {combos.map((c) => c.name.az).join(', ')}. Silinsə, həmin setlərin tərkibindən də çıxarılacaq.
+      </p>
+    ) : null;
+  };
+  const nameOf = (id: string) => data.catalog.items.find((i) => i.id === id)?.name.az ?? id;
+
+  /** Take items off this branch's menu. They stay in the catalog and at the other branches. */
+  const removeFromBranch = useCallback(
     async (ids: string[]) => {
-      const names = ids.map((id) => menu.items.find((i) => i.id === id)?.name.az).filter(Boolean) as string[];
-      const combos = [...new Map(ids.flatMap((id) => usedInCombos(menu, id)).filter((c) => !ids.includes(c.id)).map((c) => [c.id, c])).values()];
+      const names = ids.map(nameOf);
+      const ok = await confirm({
+        title: names.length === 1 ? `${names[0]}: ${bn} menyusundan çıxarılsın?` : `${names.length} məhsul ${bn} menyusundan çıxarılsın?`,
+        body: (
+          <>
+            {names.length > 1 && <p className="mb-2 text-sm">{names.slice(0, 8).join(', ')}{names.length > 8 ? '…' : ''}</p>}
+            <p>Digər filiallara təsir etmir. Yalnız müvəqqəti gizlətmək istəyirsinizsə, &quot;Bitib&quot; edin. Geri qaytarmaq olar (Tarixçə).</p>
+          </>
+        ),
+        ok: 'Çıxar',
+        danger: true,
+      });
+      if (!ok) return;
+      update((d) => ids.reduce((acc, id) => setSold(acc, branch, id, null), d));
+      setSelected(new Set());
+      toast(`${names.length === 1 ? names[0] : `${names.length} məhsul`} ${bn} menyusundan çıxarıldı (hələ yayımlanmayıb)`);
+    },
+    [data, branch, bn, confirm, update, toast],
+  );
+
+  /** Delete products everywhere: catalog, every branch, combo contents. */
+  const deleteEverywhere = useCallback(
+    async (ids: string[]) => {
+      const names = ids.map(nameOf);
+      const where = [...new Set(ids.flatMap((id) => soldAt(data, id)))].map((b) => branchName(data, b));
       const ok = await confirm({
         title: names.length === 1 ? `${names[0]} silinsin?` : `${names.length} məhsul silinsin?`,
         body: (
           <>
-            {names.length > 1 && <p className="mb-2 text-sm">{names.slice(0, 8).join(', ')}{names.length > 8 ? '…' : ''}</p>}
-            <p>Bu geri qaytarıla bilər (Tarixçə). Yalnız müvəqqəti gizlətmək istəyirsinizsə, &quot;Bitib&quot; edin.</p>
-            {combos.length > 0 && (
-              <p className="mt-3 rounded-xl bg-gold/10 p-3 text-sm text-gold">
-                ⚠ Bu setlərin tərkibində istifadə olunur: {combos.map((c) => c.name.az).join(', ')}. Silinsə, həmin setlərin tərkibindən də çıxarılacaq.
-              </p>
-            )}
+            <p>
+              Bütün filiallardan silinəcək{where.length ? ` (${where.join(', ')})` : ''}. Bu geri qaytarıla bilər (Tarixçə). Yalnız bir filialdan çıxarmaq üçün həmin filialın açarını söndürün.
+            </p>
+            {combosWarning(ids)}
           </>
         ),
-        ok: 'Sil',
+        ok: 'Hər yerdən sil',
         danger: true,
       });
       if (!ok) return;
-      setMenu((m) => deleteItems(m, ids));
+      update((d) => deleteProducts(d, ids));
       setSelected(new Set());
       if (editing && ids.includes(editing)) setEditing(null);
       toast(names.length === 1 ? `${names[0]} silindi (hələ yayımlanmayıb)` : `${names.length} məhsul silindi (hələ yayımlanmayıb)`);
     },
-    [menu, confirm, setMenu, toast, editing],
+    [data, confirm, update, toast, editing],
   );
 
   // keyboard: "/" search, "N" new item
@@ -97,9 +185,9 @@ export default function MenuScreen() {
       else n.add(id);
       return n;
     });
-  const setAvail = (ids: string[], v: boolean) => setMenu((m) => ids.reduce((acc, id) => updateItem(acc, id, { available: v }), m));
+  const setAvail = (ids: string[], v: boolean) => update((d) => ids.reduce((acc, id) => updateEntry(acc, branch, id, { available: v }), d));
 
-  const rowState = (i: RawMenuItem) => {
+  const rowState = (i: Row) => {
     const b = baseById.get(i.id);
     return !b ? 'new' : JSON.stringify(b) !== JSON.stringify(i) ? 'changed' : null;
   };
@@ -121,9 +209,10 @@ export default function MenuScreen() {
         <div>
           <h1 className="font-display text-3xl uppercase">Menyu</h1>
           <p className="text-sm text-mute">
-            {counts.all} məhsul{counts.off > 0 && <> · <span className="text-[#ff7a70]">{counts.off} bitib</span></>}
+            {bn}: {counts.all} məhsul{counts.off > 0 && <> · <span className="text-[#ff7a70]">{counts.off} bitib</span></>}
           </p>
         </div>
+        <BranchTabs />
         <div className="hidden gap-2 md:flex">
           <button onClick={() => setBulkOpen(true)} className={btn.ghost}>
             ± Toplu qiymət
@@ -176,6 +265,32 @@ export default function MenuScreen() {
         </select>
       </div>
 
+      {notSold.length > 0 && (
+        <div className="mb-3 mt-1">
+          <button onClick={() => setShowNotSold((v) => !v)} aria-expanded={showNotSold} className="text-sm font-semibold text-mute hover:text-cream">
+            {showNotSold ? '▾' : '▸'} {bn} filialında satılmayan məhsullar ({notSold.length})
+          </button>
+          {showNotSold && (
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="not-sold">
+              {notSold.map((i) => (
+                <li key={i.id} className="flex items-center gap-3 rounded-xl border border-dashed border-white/10 p-2.5">
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    <b>{i.name.az}</b>
+                    <span className="block text-xs text-mute">
+                      {catName.get(i.category)?.name.az}
+                      {soldAt(data, i.id).length > 0 && ` · ${soldAt(data, i.id).map((b) => branchName(data, b)).join(', ')}`}
+                    </span>
+                  </span>
+                  <button onClick={() => setAdding(i)} className="shrink-0 rounded-lg bg-white/5 px-3 py-2 text-xs font-bold hover:bg-white/10">
+                    + {bn} menyusuna
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* bulk actions (desktop) */}
       {selected.size > 0 && (
         <div className="sticky top-[4.6rem] z-20 -mx-8 mb-2 hidden flex-wrap items-center gap-2 border-b border-gold/30 bg-[#1b160c] px-8 py-2.5 md:flex" role="region" aria-label="Toplu əməliyyatlar">
@@ -193,8 +308,8 @@ export default function MenuScreen() {
             onChange={(e) => {
               const to = e.target.value;
               if (!to) return;
-              setMenu((m) => [...selected].reduce((acc, id) => updateItem(acc, id, { category: to, group: undefined }), m));
-              toast(`${selected.size} məhsul "${catName.get(to)?.name.az}" kateqoriyasına köçürüldü`);
+              update((d) => [...selected].reduce((acc, id) => updateCatalogItem(acc, id, { category: to, group: undefined }), d));
+              toast(`${selected.size} məhsul bütün filiallarda "${catName.get(to)?.name.az}" kateqoriyasına köçürüldü`);
             }}
           >
             <option value="">Kateqoriyanı dəyiş…</option>
@@ -207,8 +322,8 @@ export default function MenuScreen() {
           <button className={btn.ghost} onClick={() => setBulkOpen(true)}>
             ± Qiymət
           </button>
-          <button className={btn.danger} onClick={() => askDelete([...selected])}>
-            🗑 Sil
+          <button className={btn.danger} onClick={() => removeFromBranch([...selected])}>
+            Bu filialdan çıxar
           </button>
           <button className="ml-auto text-sm text-mute hover:text-cream" onClick={() => setSelected(new Set())}>
             Seçimi təmizlə
@@ -240,9 +355,10 @@ export default function MenuScreen() {
             rowState={rowState}
             srcFor={srcFor}
             onEdit={setEditing}
-            onDelete={askDelete}
+            onDelete={removeFromBranch}
             onAvail={(id, v) => setAvail([id], v)}
-            onPlace={(id, before) => setMenu((m) => placeItem(m, id, before))}
+            onPlace={(id, before) => update((d) => placeEntry(d, branch, id, before))}
+            branch={branch}
           />
           <MobileList
             rows={rows}
@@ -253,7 +369,8 @@ export default function MenuScreen() {
             srcFor={srcFor}
             onEdit={setEditing}
             onAvail={(id, v) => setAvail([id], v)}
-            onMove={(id, dir) => setMenu((m) => moveItem(m, id, dir))}
+            onMove={(id, dir) => update((d) => moveEntry(d, branch, id, dir))}
+            branch={branch}
           />
         </>
       )}
@@ -272,21 +389,23 @@ export default function MenuScreen() {
           id={editing}
           defaultCategory={cat !== 'all' ? cat : undefined}
           onClose={() => setEditing(null)}
-          onDelete={askDelete}
+          onDelete={deleteEverywhere}
           onOpen={setEditing}
         />
       )}
+      {adding && <AddToBranchDialog item={adding} onClose={() => setAdding(null)} />}
       {bulkOpen && <BulkPriceDialog selectedIds={[...selected]} onClose={() => setBulkOpen(false)} />}
     </div>
   );
 }
 
 type RowProps = {
-  rows: RawMenuItem[];
+  rows: Row[];
+  branch: string;
   catName: Map<string, { name: { az: string }; icon: string }>;
   grouped: boolean;
   canReorder: boolean;
-  rowState: (i: RawMenuItem) => 'new' | 'changed' | null;
+  rowState: (i: Row) => 'new' | 'changed' | null;
   srcFor: (image?: string) => string | undefined;
   onEdit: (id: string) => void;
   onAvail: (id: string, v: boolean) => void;
@@ -308,7 +427,7 @@ function StateBadge({ s }: { s: 'new' | 'changed' | null }) {
   return <span className={`rounded px-1.5 py-0.5 text-[10px] font-black uppercase ${s === 'new' ? 'bg-ok/20 text-ok' : 'bg-gold/15 text-gold'}`}>{s === 'new' ? 'yeni' : 'dəyişib'}</span>;
 }
 
-function withHeaders<T>(rows: RawMenuItem[], grouped: boolean, render: (i: RawMenuItem) => T, header: (cat: string) => T): T[] {
+function withHeaders<T>(rows: Row[], grouped: boolean, render: (i: Row) => T, header: (cat: string) => T): T[] {
   const out: T[] = [];
   let last = '';
   for (const i of rows) {
@@ -334,6 +453,7 @@ function DesktopTable({
   onDelete,
   onAvail,
   onPlace,
+  branch,
 }: RowProps & {
   selected: Set<string>;
   toggleSel: (id: string) => void;
@@ -347,7 +467,7 @@ function DesktopTable({
   const allSel = rows.length > 0 && rows.every((r) => selected.has(r.id));
   const dragCat = drag ? rows.find((r) => r.id === drag)?.category : null;
 
-  const drop = (target: RawMenuItem) => {
+  const drop = (target: Row) => {
     if (!drag || drag === target.id) return;
     const ids = rows.filter((r) => r.category === target.category).map((r) => r.id);
     const from = ids.indexOf(drag);
@@ -441,10 +561,10 @@ function DesktopTable({
                   </td>
                   <td className="border-b border-white/5 py-2 text-mute">{c?.name.az}</td>
                   <td className="border-b border-white/5 py-2 text-right">
-                    <PriceInput item={i} col="price" list="desk" />
+                    <PriceInput branch={branch} itemId={i.id} col="price" list="desk" />
                   </td>
                   <td className="border-b border-white/5 py-2 text-right">
-                    <PriceInput item={i} col="oldPrice" list="desk" />
+                    <PriceInput branch={branch} itemId={i.id} col="oldPrice" list="desk" />
                   </td>
                   <td className="border-b border-white/5 py-2 text-center">
                     <Switch on={i.available} onChange={(v) => onAvail(i.id, v)} label={`${i.name.az}: mövcuddur`} />
@@ -453,7 +573,7 @@ function DesktopTable({
                     <button onClick={() => onEdit(i.id)} className={btn.icon} aria-label={`${i.name.az}: redaktə et`} title="Redaktə et">
                       ✎
                     </button>
-                    <button onClick={() => onDelete([i.id])} className={btn.icon} aria-label={`${i.name.az}: sil`} title="Sil">
+                    <button onClick={() => onDelete([i.id])} className={btn.icon} aria-label={`${i.name.az}: bu filialdan çıxar`} title="Bu filialdan çıxar">
                       🗑
                     </button>
                   </td>
@@ -474,7 +594,7 @@ function DesktopTable({
   );
 }
 
-function MobileList({ rows, catName, grouped, canReorder, rowState, srcFor, onEdit, onAvail, onMove }: RowProps & { onMove: (id: string, dir: -1 | 1) => void }) {
+function MobileList({ rows, catName, grouped, canReorder, rowState, srcFor, onEdit, onAvail, onMove, branch }: RowProps & { onMove: (id: string, dir: -1 | 1) => void }) {
   return (
     <div className="grid gap-2 md:hidden">
       {withHeaders(
@@ -505,7 +625,7 @@ function MobileList({ rows, catName, grouped, canReorder, rowState, srcFor, onEd
                 <Switch on={i.available} onChange={(v) => onAvail(i.id, v)} label={`${i.name.az}: mövcuddur`} size="lg" />
               </div>
               <div className="mt-3 flex items-center gap-2">
-                <PriceInput item={i} col="price" list="mob" className="min-h-11 w-28 text-lg" />
+                <PriceInput branch={branch} itemId={i.id} col="price" list="mob" className="min-h-11 w-28 text-lg" />
                 <span className="text-mute">₼</span>
                 {i.oldPrice !== undefined && <s className="text-sm text-mute">{i.oldPrice.toFixed(2)}</s>}
                 <div className="ml-auto flex">
@@ -538,8 +658,10 @@ function MobileList({ rows, catName, grouped, canReorder, rowState, srcFor, onEd
 }
 
 function BulkPriceDialog({ selectedIds, onClose }: { selectedIds: string[]; onClose: () => void }) {
-  const { menu, setMenu, toast } = useAdmin();
+  const { data, update, toast, branch } = useAdmin();
+  const menu = data.catalog;
   const [scope, setScope] = useState<string>(selectedIds.length ? 'selected' : menu.categories[0].id);
+  const [branches, setBranches] = useState<string[]>([branch]);
   const [mode, setMode] = useState<BulkOp['mode']>('amount');
   const [raw, setRaw] = useState('');
   const [roundTo10, setRoundTo10] = useState(false);
@@ -547,7 +669,8 @@ function BulkPriceDialog({ selectedIds, onClose }: { selectedIds: string[]; onCl
   const value = Number(raw.trim().replace(',', '.'));
   const valid = raw.trim() !== '' && Number.isFinite(value) && value !== 0;
   const ids = scope === 'selected' ? selectedIds : menu.items.filter((i) => i.category === scope).map((i) => i.id);
-  const preview = valid ? previewBulk(menu, ids, { mode, value, roundTo10 }) : [];
+  const preview = valid ? previewBulk(data, branches, ids, { mode, value, roundTo10 }) : [];
+  const many = branches.length > 1;
   const problems = preview.filter((p) => p.problem);
 
   return (
@@ -585,6 +708,25 @@ function BulkPriceDialog({ selectedIds, onClose }: { selectedIds: string[]; onCl
           </div>
         </div>
       </div>
+      <fieldset className="mt-4">
+        <legend className="mb-1.5 text-sm font-semibold">Hansı filiallarda</legend>
+        <div className="flex flex-wrap gap-2">
+          {data.branches.branches.map((b) => {
+            const on = branches.includes(b.id);
+            return (
+              <label key={b.id} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-semibold ${on ? 'border-gold bg-gold/15 text-gold' : 'border-white/15'}`}>
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[#f29a1f]"
+                  checked={on}
+                  onChange={() => setBranches((x) => (on ? x.filter((y) => y !== b.id) : [...x, b.id]))}
+                />
+                {b.name.az}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
       <label className="mt-3 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={roundTo10} onChange={(e) => setRoundTo10(e.target.checked)} className="size-4 accent-[#f29a1f]" />
         Qiymətləri 0.10-a yuvarlaqlaşdır (məs. 6.38 → 6.40)
@@ -600,8 +742,9 @@ function BulkPriceDialog({ selectedIds, onClose }: { selectedIds: string[]; onCl
             <table className="w-full text-sm" data-testid="bulk-preview">
               <tbody>
                 {preview.map((p) => (
-                  <tr key={p.id} className={`border-b border-white/5 ${p.problem ? 'bg-red/10' : ''}`}>
+                  <tr key={`${p.branch}:${p.id}`} className={`border-b border-white/5 ${p.problem ? 'bg-red/10' : ''}`}>
                     <td className="px-3 py-2">
+                      {many && <span className="mr-1 text-xs font-bold text-gold">{branchName(data, p.branch)} ·</span>}
                       {p.name}
                       {p.problem && <span className="block text-xs text-[#ff7a70]">{p.problem}</span>}
                     </td>
@@ -623,7 +766,7 @@ function BulkPriceDialog({ selectedIds, onClose }: { selectedIds: string[]; onCl
         <button
           disabled={!valid || !preview.length || problems.length > 0}
           onClick={() => {
-            setMenu((m) => applyBulkPrices(m, preview));
+            update((d) => applyBulkPrices(d, preview));
             toast(`${preview.length} məhsulun qiyməti dəyişdi (hələ yayımlanmayıb)`);
             onClose();
           }}
@@ -632,6 +775,52 @@ function BulkPriceDialog({ selectedIds, onClose }: { selectedIds: string[]; onCl
           {preview.length ? `${preview.length} qiyməti dəyiş` : 'Tətbiq et'}
         </button>
       </div>
+    </Dialog>
+  );
+}
+
+/** "+ Nərimanov menyusuna": asks for this branch's price (suggesting another branch's) and puts it on the menu. */
+function AddToBranchDialog({ item, onClose }: { item: CatalogItem; onClose: () => void }) {
+  const { data, update, branch, toast } = useAdmin();
+  const bn = branchName(data, branch);
+  const elsewhere = Object.entries(data.menus)
+    .map(([b, m]) => [b, m.items.find((e) => e.id === item.id)] as const)
+    .filter(([, e]) => e);
+  const [price, setPrice] = useState(elsewhere[0]?.[1]?.price.toFixed(2) ?? '');
+  const n = parsePrice(price);
+  const add = () => {
+    if (n === null) return;
+    update((d) => setSold(d, branch, item.id, { price: n, available: true }));
+    toast(`${item.name.az} ${bn} menyusuna əlavə olundu (hələ yayımlanmayıb)`);
+    onClose();
+  };
+  return (
+    <Dialog open onClose={onClose} title={`${item.name.az}: ${bn} menyusuna əlavə et`}>
+      {elsewhere.length > 0 && (
+        <p className="mt-2 text-sm text-mute">
+          Digər filiallarda: {elsewhere.map(([b, e]) => `${branchName(data, b)} ${e!.price.toFixed(2)} ₼`).join(' · ')}
+        </p>
+      )}
+      <form
+        className="mt-4 grid gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+      >
+        <label className="grid gap-1.5 text-sm font-semibold">
+          {bn} qiyməti (₼)
+          <input data-autofocus className={input} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} aria-invalid={price !== '' && n === null} />
+        </label>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className={btn.ghost}>
+            İmtina
+          </button>
+          <button disabled={n === null} className={btn.gold}>
+            Əlavə et
+          </button>
+        </div>
+      </form>
     </Dialog>
   );
 }

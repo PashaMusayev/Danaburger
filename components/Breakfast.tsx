@@ -2,26 +2,25 @@
 
 import ProductImage from './ProductImage';
 import SectionTitle from './SectionTitle';
-import { useStore } from '@/lib/store';
-import { fmt, items } from '@/lib/menu';
-
-const breakfasts = items.filter((i) => i.category === 'breakfast');
+import { useBranch, useStore } from '@/lib/store';
+import { fmt } from '@/lib/menu';
 
 // Breakfast sits deep in the menu (and has no discount, so it's not in Deals); surface it on the home page.
 export default function Breakfast() {
   const { t, locale, add, openItem } = useStore();
+  const breakfasts = useBranch().menu.items.filter((i) => i.category === 'breakfast');
   if (!breakfasts.length) return null;
   return (
     <section id="breakfast" className="py-12" aria-labelledby="breakfast-title">
       <div className="mx-auto max-w-6xl px-4">
         <SectionTitle kicker={t.breakfast.kicker} title={t.breakfast.title} id="breakfast-title" />
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className={`grid gap-4 ${breakfasts.length > 1 ? 'md:grid-cols-2' : 'md:max-w-xl'}`}>
           {breakfasts.map((b) => (
             <article key={b.id} className="group overflow-hidden rounded-3xl border border-gold/20 bg-card">
               <button onClick={() => openItem(b)} className="relative block w-full text-left" aria-label={`${t.breakfast.more}: ${b.name[locale]}`}>
                 <ProductImage item={b} sizes="(max-width:768px) 100vw, 560px" className="aspect-[16/9]" />
                 <span className="absolute left-3 top-3 rounded-full bg-gold px-3 py-1 text-sm font-black text-ink">
-                  ☀️ {b.id === 'seher-2' ? t.breakfast.for2 : t.breakfast.for1}
+                  ☀️ {b.id === 'seher-2' ? t.breakfast.for2 : b.id === 'seher-1' ? t.breakfast.for1 : t.breakfast.title}
                 </span>
               </button>
               <div className="p-4">

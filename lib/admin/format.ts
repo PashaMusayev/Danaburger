@@ -1,6 +1,6 @@
-import type { MenuData, RawMenuItem } from '../menu';
+import type { BranchEntry, BranchMenuFile, Catalog, CatalogItem } from '../menu';
 
-// data/menu.json keeps one item per line so git diffs show exactly what the owner changed.
+// data/menu.json and data/branches/*.json keep one item per line so git diffs show exactly what the owner changed.
 // This reproduces the file's existing style byte for byte: ", " / ": " separators, non-ASCII kept,
 // and prices always written with a decimal point (3.0, not 3).
 const FLOAT_KEYS = new Set(['price', 'oldPrice']);
@@ -17,8 +17,8 @@ function dump(v: unknown, key?: string): string {
   return JSON.stringify(v);
 }
 
-/** Stable key order for items created or edited in the panel. */
-export function canonicalItem(i: RawMenuItem): RawMenuItem {
+/** Stable key order for catalog items created or edited in the panel. */
+export function canonicalItem(i: CatalogItem): CatalogItem {
   const l10n = (x: { az: string; ru?: string; en?: string }) => ({ az: x.az, ru: x.ru ?? '', en: x.en ?? '' });
   return {
     id: i.id,
@@ -26,17 +26,25 @@ export function canonicalItem(i: RawMenuItem): RawMenuItem {
     ...(i.group && { group: l10n(i.group) }),
     name: l10n(i.name),
     description: i.description,
-    price: i.price,
-    ...(i.oldPrice !== undefined && { oldPrice: i.oldPrice }),
     ...(i.image && { image: i.image }),
     tags: i.tags,
-    available: i.available,
     ...(i.includes?.length && { includes: i.includes.map((s) => ({ anyOf: s.anyOf, qty: s.qty })) }),
   };
 }
 
-export function formatMenu(m: MenuData): string {
-  const list = (xs: unknown[]) => xs.map((x, i) => `    ${dump(x)}${i < xs.length - 1 ? ',' : ''}`);
+export function canonicalEntry(e: BranchEntry): BranchEntry {
+  return {
+    id: e.id,
+    price: e.price,
+    ...(e.oldPrice !== undefined && { oldPrice: e.oldPrice }),
+    available: e.available,
+    ...(e.description !== undefined && { description: e.description }),
+  };
+}
+
+const list = (xs: unknown[]) => xs.map((x, i) => `    ${dump(x)}${i < xs.length - 1 ? ',' : ''}`);
+
+export function formatCatalog(m: Catalog): string {
   return [
     '{',
     `  "currency": ${JSON.stringify(m.currency)},`,
@@ -51,4 +59,10 @@ export function formatMenu(m: MenuData): string {
   ].join('\n');
 }
 
-export const formatSettings = (s: unknown) => JSON.stringify(s, null, 2) + '\n';
+/** data/branches/<id>.json: one item per line, like the catalog. */
+export function formatBranchMenu(m: BranchMenuFile): string {
+  return ['{', '  "items": [', ...list(m.items), '  ]', '}', ''].join('\n');
+}
+
+/** settings.json and branches.json: plain 2-space JSON. */
+export const formatJson = (s: unknown) => JSON.stringify(s, null, 2) + '\n';

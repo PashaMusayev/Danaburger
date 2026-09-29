@@ -8,6 +8,7 @@ import { Dialog, btn } from './ui';
 
 const NAV = [
   { href: '/admin/', label: 'Menyu', icon: '🍔' },
+  { href: '/admin/compare/', label: 'Müqayisə', icon: '⚖️' },
   { href: '/admin/history/', label: 'Tarixçə', icon: '🕘' },
   { href: '/admin/settings/', label: 'Ayarlar', icon: '⚙️' },
 ];
@@ -85,7 +86,7 @@ function Shell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
-        <nav className="grid grid-cols-3 border-t border-white/5" aria-label="Admin">
+        <nav className="grid grid-cols-4 border-t border-white/5" aria-label="Admin">
           {NAV.map((n) => (
             <Link
               key={n.href}

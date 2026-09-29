@@ -3,15 +3,18 @@
 import { useState } from 'react';
 import SectionTitle from './SectionTitle';
 import OpenBadge from './OpenBadge';
-import { useStore } from '@/lib/store';
+import { useBranch, useStore } from '@/lib/store';
 import { config, mapLinks, telHref, whatsappHref } from '@/lib/config';
 import { track } from '@/lib/analytics';
 
 export default function Location() {
   const { t, locale } = useStore();
+  const { branch } = useBranch();
   // The map iframe is heavy; load it only when asked so the page stays fast.
   const [showMap, setShowMap] = useState(false);
-  const tel = telHref();
+  const tel = telHref(branch.phone);
+  // No coordinates yet → no map and no "Yol tarifi" buttons.
+  const links = branch.geo ? mapLinks(branch.geo) : null;
   const delivery = Object.entries(config.delivery).filter(([, url]) => url);
 
   return (
@@ -23,18 +26,18 @@ export default function Location() {
           <dl className="mt-6 grid gap-5">
             <div>
               <dt className="text-xs font-bold uppercase tracking-widest text-mute">{t.contact.hours}</dt>
-              <dd className="mt-1 font-display text-3xl">{t.contact.hoursValue}</dd>
+              <dd className="mt-1 font-display text-3xl">{t.contact.hoursValue(branch.hours.open, branch.hours.close)}</dd>
             </div>
             <div>
               <dt className="text-xs font-bold uppercase tracking-widest text-mute">{t.contact.address}</dt>
-              <dd className="mt-1 text-lg">{config.address[locale]}</dd>
+              <dd className="mt-1 text-lg">{branch.address[locale] || branch.address.az}</dd>
             </div>
             <div>
               <dt className="text-xs font-bold uppercase tracking-widest text-mute">{t.contact.phone}</dt>
               <dd className="mt-1 text-lg">
                 {tel ? (
-                  <a href={tel} onClick={() => track('call_click', { location: 'contact' })} className="font-bold text-gold">
-                    {config.phone}
+                  <a href={tel} onClick={() => track('call_click', { location: 'contact', branch: branch.id })} className="font-bold text-gold">
+                    {branch.phone}
                   </a>
                 ) : (
                   <span className="text-mute">{t.contact.phoneSoon}</span>
@@ -43,31 +46,32 @@ export default function Location() {
             </div>
           </dl>
 
-          <p className="mt-8 text-xs font-bold uppercase tracking-widest text-mute">{t.contact.directions}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {(
-              [
-                ['Google Maps', mapLinks.google],
-                ['Waze', mapLinks.waze],
-                ['Yandex', mapLinks.yandex],
-              ] as const
+          {links && <p className="mt-8 text-xs font-bold uppercase tracking-widest text-mute">{t.contact.directions}</p>}
+          <div className={`flex flex-wrap gap-2 ${links ? 'mt-2' : 'mt-8'}`}>
+            {(links
+              ? ([
+                  ['Google Maps', links.google],
+                  ['Waze', links.waze],
+                  ['Yandex', links.yandex],
+                ] as const)
+              : []
             ).map(([name, href]) => (
               <a
                 key={name}
                 href={href}
                 target="_blank"
                 rel="noopener"
-                onClick={() => track('directions_click', { app: name })}
+                onClick={() => track('directions_click', { app: name, branch: branch.id })}
                 className="rounded-xl bg-cream px-4 py-3 font-bold text-ink transition hover:bg-white"
               >
                 📍 {name}
               </a>
             ))}
             <a
-              href={whatsappHref(t.cart.msgHello)}
+              href={whatsappHref(branch.whatsapp, t.cart.msgHello(branch.name.az))}
               target="_blank"
               rel="noopener"
-              onClick={() => track('whatsapp_click', { location: 'contact' })}
+              onClick={() => track('whatsapp_click', { location: 'contact', branch: branch.id })}
               className="rounded-xl bg-[#25D366] px-4 py-3 font-bold text-ink"
             >
               💬 WhatsApp
@@ -95,11 +99,12 @@ export default function Location() {
           )}
         </div>
 
+        {links && branch.geo && (
         <div className="relative min-h-80 overflow-hidden rounded-3xl border border-white/10 bg-card">
           {showMap ? (
             <iframe
-              src={mapLinks.embed}
-              title="Dana Burger xəritədə"
+              src={links.embed}
+              title={`Dana Burger ${branch.name.az} xəritədə`}
               className="absolute inset-0 size-full grayscale-[.3] invert-[.9] hue-rotate-180"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
@@ -114,11 +119,12 @@ export default function Location() {
               </span>
               <span className="rounded-full bg-cream px-5 py-2.5 font-bold text-ink">🗺 {t.contact.title}</span>
               <span className="text-xs text-mute">
-                {config.geo.lat}, {config.geo.lng}
+                {branch.geo.lat}, {branch.geo.lng}
               </span>
             </button>
           )}
         </div>
+        )}
       </div>
     </section>
   );

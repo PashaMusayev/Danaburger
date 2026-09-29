@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react';
 import Sheet from './Sheet';
 import ProductImage from './ProductImage';
-import { useStore } from '@/lib/store';
-import { fmt, items, savings } from '@/lib/menu';
+import { useBranch, useStore } from '@/lib/store';
+import { fmt, savings } from '@/lib/menu';
 
 const SAUCE_CATS = new Set(['burgers', 'signature', 'shawarma', 'grill', 'fastfood', 'lahmacun', 'pide', 'pizza']);
-const sauces = items.filter((i) => i.category === 'sauces').slice(0, 8);
 
 export default function ProductSheet() {
   const { sheetItem: item, openItem, t, locale, add } = useStore();
+  const { menu } = useBranch();
+  // the branch's own sauces; a branch that sells none gets no sauce offer
+  const sauces = menu.sauces.slice(0, 8);
   const [qty, setQty] = useState(1);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
@@ -21,8 +23,8 @@ export default function ProductSheet() {
 
   if (!item) return null;
   const close = () => openItem(null);
-  const offerSauce = SAUCE_CATS.has(item.category);
-  const extra = [...picked].reduce((s, id) => s + (items.find((i) => i.id === id)?.price ?? 0), 0);
+  const offerSauce = SAUCE_CATS.has(item.category) && sauces.length > 0;
+  const extra = [...picked].reduce((s, id) => s + (menu.itemById.get(id)?.price ?? 0), 0);
   // one sauce per portion
   const total = (item.price + extra) * qty;
   const isSet = item.category === 'sets' || item.category === 'combos' || item.category === 'breakfast';

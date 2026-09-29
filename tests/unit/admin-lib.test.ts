@@ -1,17 +1,38 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { MenuData, RawMenuItem } from '@/lib/menu';
+import type { BranchMenuFile, Catalog } from '@/lib/menu';
 import { applyBulk, isSuspiciousChange, parsePrice } from '@/lib/admin/price';
 import { searchNorm, slugify, uniqueId } from '@/lib/admin/slug';
-import { duplicateName, validateItem, validateMenu } from '@/lib/admin/validate';
-import { commitMessage, diffMenu, diffSettings } from '@/lib/admin/diff';
-import { addItem, deleteItems, moveItem, placeItem, previewBulk, updateItem, usedInCombos } from '@/lib/admin/ops';
-import { normalizePhone, validateSettings } from '@/lib/admin/settings';
-import settings from '@/data/settings.json';
+import { duplicateName, validateData, validateEntry, validateItem } from '@/lib/admin/validate';
+import { commitMessage, diffData } from '@/lib/admin/diff';
+import {
+  addProduct,
+  applyBulkPrices,
+  deleteProducts,
+  duplicateProduct,
+  moveEntry,
+  placeEntry,
+  previewBulk,
+  setSold,
+  soldAt,
+  updateCatalogItem,
+  updateEntry,
+  usedInCombos,
+} from '@/lib/admin/ops';
+import { normalizePhone, parseGeo, validateBranchInfo, validateSettings } from '@/lib/admin/settings';
+import type { AdminData } from '@/lib/admin/model';
 
-const menu = JSON.parse(readFileSync('data/menu.json', 'utf8')) as MenuData;
-const cats = new Set(menu.categories.map((c) => c.id));
-const byId = (m: MenuData, id: string) => m.items.find((i) => i.id === id)!;
+const json = <T,>(p: string) => JSON.parse(readFileSync(p, 'utf8')) as T;
+const data: AdminData = {
+  catalog: json<Catalog>('data/menu.json'),
+  branches: json('data/branches.json'),
+  settings: json('data/settings.json'),
+  menus: Object.fromEntries(['gunesli', 'narimanov', '4-mkr'].map((b) => [b, json<BranchMenuFile>(`data/branches/${b}.json`)])),
+};
+const cats = new Set(data.catalog.categories.map((c) => c.id));
+const entry = (d: AdminData, b: string, id: string) => d.menus[b].items.find((e) => e.id === id);
+const item = (d: AdminData, id: string) => d.catalog.items.find((i) => i.id === id)!;
+const ids = (d: AdminData, b: string, cat: string) => d.menus[b].items.filter((e) => item(d, e.id)?.category === cat).map((e) => e.id);
 
 describe('parsePrice', () => {
   it.each([
@@ -57,106 +78,172 @@ describe('slugify / uniqueId', () => {
 });
 
 describe('validation', () => {
-  it('the current menu is valid', () => expect(validateMenu(menu)).toEqual([]));
-  const base = byId(menu, 'ciz-burger');
-  it('requires an AZ name and a real price', () => {
+  it('the current data is valid', () => expect(validateData(data)).toEqual([]));
+  const base = item(data, 'ciz-burger');
+  it('catalog: AZ name, category, photo path', () => {
     expect(validateItem({ ...base, name: { az: ' ' } }, cats).name).toBeTruthy();
-    expect(validateItem({ ...base, price: 0 }, cats).price).toBeTruthy();
-    expect(validateItem({ ...base, price: 5.805 }, cats).price).toBeTruthy();
+    expect(validateItem({ ...base, category: 'nope' }, cats).category).toBeTruthy();
+    expect(validateItem({ ...base, image: 'https://evil/x.png' }, cats).image).toBeTruthy();
   });
-  it('old price must be higher than the price', () => {
-    expect(validateItem({ ...base, oldPrice: 5.8 }, cats).oldPrice).toBeTruthy();
-    expect(validateItem({ ...base, oldPrice: 6.5 }, cats)).toEqual({});
+  it('branch price line: real price, old price above it', () => {
+    expect(validateEntry({ price: 0 }).price).toBeTruthy();
+    expect(validateEntry({ price: 5.805 }).price).toBeTruthy();
+    expect(validateEntry({ price: 5.8, oldPrice: 5.8 }).oldPrice).toBeTruthy();
+    expect(validateEntry({ price: 5.8, oldPrice: 6.5 })).toEqual({});
   });
-  it('catches broken whole-menu data the browser might send', () => {
-    expect(validateMenu({ ...menu, items: [...menu.items, { ...base }] })[0]).toContain('eyni id');
-    expect(validateMenu({ ...menu, items: [{ ...base, tags: ['bogus'] as unknown as RawMenuItem['tags'] }] })[0]).toContain('etiket');
-    expect(validateMenu({ ...menu, items: [{ ...base, id: '../x' }] })[0]).toContain('id');
-    expect(validateMenu({ ...menu, items: [{ ...base, image: 'https://evil/x.png' }] })[0]).toContain('Foto');
-    expect(validateMenu(null)).toEqual(['Menyu formatı düzgün deyil.']);
+  it('catches broken data the browser might send', () => {
+    const bad = (patch: Partial<AdminData>) => validateData({ ...data, ...patch });
+    expect(bad({ menus: { ...data.menus, gunesli: { items: [...data.menus.gunesli.items, { id: 'ghost', price: 1, available: true }] } } })[0]).toContain('kataloqda olmayan');
+    expect(bad({ menus: { ...data.menus, gunesli: { items: [...data.menus.gunesli.items, data.menus.gunesli.items[0]] } } })[0]).toContain('iki dəfə');
+    expect(bad({ menus: { gunesli: data.menus.gunesli } })[0]).toContain('filial siyahısına uyğun deyil');
+    expect(bad({ catalog: { ...data.catalog, items: [...data.catalog.items, { ...base }] } })[0]).toContain('eyni id');
+    expect(bad({ catalog: { ...data.catalog, items: [{ ...base, id: '../x' }] } })[0]).toContain('id');
+    expect(validateData(null)).toEqual(['Menyu formatı düzgün deyil.']);
   });
   it('warns about duplicate names in one category', () => {
-    expect(duplicateName({ ...base, id: 'x' }, menu.items)).toBe(true);
-    expect(duplicateName({ ...base, id: 'x', category: 'grill' }, menu.items)).toBe(false);
+    expect(duplicateName({ ...base, id: 'x' }, data.catalog.items)).toBe(true);
+    expect(duplicateName({ ...base, id: 'x', category: 'grill' }, data.catalog.items)).toBe(false);
   });
 });
 
 describe('ops', () => {
-  it('new items get a unique id and land at the end of their category', () => {
-    const { menu: m, id } = addItem(menu, { category: 'lahmacun', name: { az: 'Sadə' }, description: '', price: 3, tags: [], available: true });
+  it('new product: unique id, sold only where asked, at the end of its category', () => {
+    const { data: d, id } = addProduct(data, { category: 'lahmacun', name: { az: 'Sadə' }, description: '', tags: [] }, { narimanov: { price: 3, available: true }, '4-mkr': { price: 2.8, available: true } });
     expect(id).toBe('sade');
-    const lah = m.items.filter((i) => i.category === 'lahmacun').map((i) => i.id);
-    expect(lah.at(-1)).toBe('sade');
-    expect(validateMenu(m)).toEqual([]);
+    expect(ids(d, 'narimanov', 'lahmacun').at(-1)).toBe('sade');
+    expect(entry(d, '4-mkr', 'sade')?.price).toBe(2.8);
+    expect(entry(d, 'gunesli', 'sade')).toBeUndefined();
+    expect(soldAt(d, 'sade')).toEqual(['narimanov', '4-mkr']);
+    expect(validateData(d)).toEqual([]);
   });
-  it('an existing id never changes on edit', () => {
-    const m = updateItem(menu, 'ciz-burger', { name: { az: 'Yeni ad' }, price: 6.2 });
-    expect(byId(m, 'ciz-burger').name.az).toBe('Yeni ad');
+  it('price and "bitib" change one branch only', () => {
+    const d = updateEntry(updateEntry(data, 'narimanov', 'ciz-burger', { price: 6.2 }), 'narimanov', 'kola-05', { available: false });
+    expect(entry(d, 'narimanov', 'ciz-burger')?.price).toBe(6.2);
+    expect(entry(d, 'gunesli', 'ciz-burger')?.price).toBe(5.8);
+    expect(entry(d, 'narimanov', 'kola-05')?.available).toBe(false);
+    expect(entry(d, 'gunesli', 'kola-05')?.available).toBe(true);
   });
-  it('moving to another category places the item at the end of it', () => {
-    const m = updateItem(menu, 'ciz-burger', { category: 'burgers' });
-    expect(m.items.filter((i) => i.category === 'burgers').at(-1)!.id).toBe('ciz-burger');
+  it('clearing old price / own description removes the key', () => {
+    let d = updateEntry(data, '4-mkr', 'super-set', { oldPrice: undefined });
+    expect('oldPrice' in entry(d, '4-mkr', 'super-set')!).toBe(false);
+    d = updateEntry(d, '4-mkr', 'ciz-burger', { description: undefined });
+    expect('description' in entry(d, '4-mkr', 'ciz-burger')!).toBe(false);
   });
-  it('clearing old price / image / group removes the keys', () => {
-    const m = updateItem(menu, 'super-set', { oldPrice: undefined });
-    expect('oldPrice' in byId(m, 'super-set')).toBe(false);
+  it('catalog edits apply everywhere; an existing id never changes', () => {
+    const d = updateCatalogItem(data, 'ciz-burger', { name: { az: 'Yeni ad' } });
+    expect(item(d, 'ciz-burger').name.az).toBe('Yeni ad');
+    expect(d.menus).toBe(data.menus);
   });
-  it('delete removes the item and its references from combos', () => {
-    expect(usedInCombos(menu, 'ciz-burger').map((c) => c.id)).toEqual(['burgerci-et', 'mix-menyu']);
-    const m = deleteItems(menu, ['ciz-burger']);
-    expect(m.items.some((i) => i.id === 'ciz-burger')).toBe(false);
-    expect(JSON.stringify(m)).not.toContain('"ciz-burger"');
-    expect(byId(m, 'burgerci-et').includes).toHaveLength(2); // the empty burger slot is dropped
-    expect(validateMenu(m)).toEqual([]);
+  it('moving to another category puts it at the end of that category in every branch', () => {
+    const d = updateCatalogItem(data, 'ciz-burger', { category: 'burgers' });
+    for (const b of ['gunesli', 'narimanov', '4-mkr']) expect(ids(d, b, 'burgers').at(-1)).toBe('ciz-burger');
   });
-  it('move and drag-and-drop stay inside the category', () => {
-    const ids = (m: MenuData) => m.items.filter((i) => i.category === 'lahmacun').map((i) => i.id);
-    expect(ids(moveItem(menu, 'lahmacun-pendirli', -1))).toEqual(['lahmacun-pendirli', 'lahmacun-sade', 'lahmacun-qarisiq']);
-    expect(ids(moveItem(menu, 'lahmacun-sade', -1))).toEqual(ids(menu)); // already first
-    expect(ids(placeItem(menu, 'lahmacun-qarisiq', 'lahmacun-sade'))).toEqual(['lahmacun-qarisiq', 'lahmacun-sade', 'lahmacun-pendirli']);
-    expect(ids(placeItem(menu, 'lahmacun-sade', null))).toEqual(['lahmacun-pendirli', 'lahmacun-qarisiq', 'lahmacun-sade']);
+  it('"not sold here" vs delete everywhere', () => {
+    const off = setSold(data, 'narimanov', 'ciz-burger', null);
+    expect(entry(off, 'narimanov', 'ciz-burger')).toBeUndefined();
+    expect(item(off, 'ciz-burger')).toBeTruthy();
+    expect(entry(off, 'gunesli', 'ciz-burger')).toBeTruthy();
+    // back on: lands at the end of its category
+    const on = setSold(off, 'narimanov', 'ciz-burger', { price: 5.9, available: true });
+    expect(ids(on, 'narimanov', 'signature').at(-1)).toBe('ciz-burger');
+
+    expect(usedInCombos(data, 'ciz-burger').map((c) => c.id)).toEqual(['burgerci-et', 'mix-menyu']);
+    const gone = deleteProducts(data, ['ciz-burger']);
+    expect(JSON.stringify(gone)).not.toContain('"ciz-burger"');
+    expect(item(gone, 'burgerci-et').includes).toHaveLength(2); // the empty burger slot is dropped
+    expect(validateData(gone)).toEqual([]);
   });
-  it('bulk preview flags prices that would break a discount', () => {
-    const p = previewBulk(menu, ['burgerci-et', 'lahmacun-sade'], { mode: 'amount', value: 2 });
-    expect(p.find((x) => x.id === 'burgerci-et')!.problem).toMatch(/Köhnə qiymət/);
-    expect(p.find((x) => x.id === 'lahmacun-sade')).toMatchObject({ from: 3.6, to: 5.6 });
+  it('a category new to a branch keeps the catalog’s category order', () => {
+    const d = setSold(data, '4-mkr', 'latte', { price: 5, available: true });
+    const order = d.menus['4-mkr'].items.map((e) => item(d, e.id).category);
+    expect(order.indexOf('coffee')).toBeGreaterThan(order.lastIndexOf('drinks'));
+  });
+  it('duplicate copies the catalog item and every branch price', () => {
+    const { data: d, id } = duplicateProduct(data, 'ciz-burger');
+    expect(item(d, id).name.az).toBe('Çizburger (kopya)');
+    expect(soldAt(d, id)).toEqual(['gunesli', 'narimanov', '4-mkr']);
+    expect(entry(d, '4-mkr', id)?.description).toBe(entry(data, '4-mkr', 'ciz-burger')?.description);
+  });
+  it('move and drag-and-drop stay inside the category of one branch', () => {
+    expect(ids(moveEntry(data, 'gunesli', 'lahmacun-pendirli', -1), 'gunesli', 'lahmacun')).toEqual(['lahmacun-pendirli', 'lahmacun-sade', 'lahmacun-qarisiq']);
+    expect(ids(moveEntry(data, 'gunesli', 'lahmacun-sade', -1), 'gunesli', 'lahmacun')).toEqual(ids(data, 'gunesli', 'lahmacun'));
+    expect(ids(placeEntry(data, 'gunesli', 'lahmacun-qarisiq', 'lahmacun-sade'), 'gunesli', 'lahmacun')).toEqual(['lahmacun-qarisiq', 'lahmacun-sade', 'lahmacun-pendirli']);
+    expect(ids(moveEntry(data, 'gunesli', 'lahmacun-pendirli', -1), 'narimanov', 'lahmacun')).toEqual(ids(data, 'narimanov', 'lahmacun'));
+  });
+  it('bulk preview per branch, flagging broken discounts', () => {
+    const p = previewBulk(data, ['gunesli', '4-mkr'], ['burgerci-et', 'lahmacun-sade', 'latte'], { mode: 'amount', value: 2 });
+    expect(p.map((r) => `${r.branch}:${r.id}`)).toEqual(['gunesli:lahmacun-sade', 'gunesli:burgerci-et', 'gunesli:latte', '4-mkr:lahmacun-sade', '4-mkr:burgerci-et']);
+    expect(p.find((r) => r.branch === '4-mkr' && r.id === 'burgerci-et')!.problem).toMatch(/Köhnə qiymət/);
+    const d = applyBulkPrices(data, p.filter((r) => !r.problem));
+    expect(entry(d, '4-mkr', 'lahmacun-sade')?.price).toBe(5.6);
+    expect(entry(d, 'narimanov', 'lahmacun-sade')?.price).toBe(3.6);
   });
 });
 
 describe('diff / commit message', () => {
-  it('describes changes the way the owner thinks about them', () => {
-    let m = updateItem(menu, 'ciz-burger', { price: 6.2 });
-    m = updateItem(m, 'kola-05', { available: false });
-    m = addItem(m, { category: 'fastfood', name: { az: 'Kartof dilimləri' }, description: '', price: 4.5, tags: [], available: true }).menu;
-    m = deleteItems(m, ['duyu']);
-    // listed in menu order (Fast food comes before Drinks)
-    expect(diffMenu(menu, m)).toEqual(['Çizburger 5.80→6.20', 'yeni: Kartof dilimləri', 'Kola 0.5 bitib', 'silindi: Düyü']);
-    expect(commitMessage(diffMenu(menu, m)).split('\n')[0]).toBe('Admin: Çizburger 5.80→6.20; yeni: Kartof dilimləri; Kola 0.5 bitib; silindi: Düyü');
+  it('names the branch for branch changes, not for shared ones', () => {
+    let d = updateEntry(data, 'narimanov', 'ciz-burger', { price: 6.2 });
+    d = updateEntry(d, '4-mkr', 'kola-05', { available: false });
+    d = addProduct(d, { category: 'fastfood', name: { az: 'Kartof dilimləri' }, description: '', tags: [] }, { gunesli: { price: 4.5, available: true } }).data;
+    d = deleteProducts(d, ['duyu']);
+    d = setSold(d, 'narimanov', 'sirab', { price: 2.5, available: true });
+    expect(diffData(data, d)).toEqual([
+      'yeni: Kartof dilimləri',
+      'silindi: Düyü',
+      'Günəşli: əlavə olundu: Kartof dilimləri 4.50',
+      'Nərimanov: Çizburger 5.80→6.20',
+      'Nərimanov: əlavə olundu: Sirab 2.50',
+      '4-cü mikrorayon: Kola 0.5 bitib',
+    ]);
+    expect(commitMessage(['Nərimanov: Çizburger 5.80→6.20'])).toBe('Admin: Nərimanov: Çizburger 5.80→6.20');
   });
-  it('mentions reordering and group-qualified names', () => {
-    expect(diffMenu(menu, moveItem(menu, 'lahmacun-pendirli', -1))).toEqual(['Lahmacun: sıralama dəyişdi']);
-    expect(diffMenu(menu, updateItem(menu, 'saurma-et-durum', { price: 4.5 }))).toEqual(['Dürüm (Ət) 4.20→4.50']);
+  it('removed from a branch, own ingredients, order, discount', () => {
+    let d = setSold(data, '4-mkr', 'bingo-burger', null);
+    d = updateEntry(d, 'gunesli', 'ciz-burger', { description: 'Xüsusi' });
+    d = moveEntry(d, 'gunesli', 'lahmacun-pendirli', -1);
+    d = updateEntry(d, '4-mkr', 'super-set', { oldPrice: undefined });
+    expect(diffData(data, d)).toEqual([
+      'Günəşli: Çizburger tərkibi dəyişdi',
+      'Günəşli: Lahmacun sıralaması dəyişdi',
+      '4-cü mikrorayon: Super Set endirim silindi',
+      '4-cü mikrorayon: çıxarıldı: Bingo burger',
+    ]);
+  });
+  it('branch info and settings', () => {
+    const d: AdminData = {
+      ...data,
+      branches: { branches: data.branches.branches.map((b) => (b.id === 'narimanov' ? { ...b, geo: { lat: 40.4, lng: 49.87 } } : b)) },
+      settings: { ...data.settings, social: { ...data.settings.social, instagram: 'https://instagram.com/danaburger' } },
+    };
+    expect(diffData(data, d)).toEqual(['Nərimanov: xəritə koordinatı yeniləndi', 'Ayarlar: Instagram yeniləndi']);
   });
   it('long lists are summarised in the subject line', () => {
     const msg = commitMessage(Array.from({ length: 9 }, (_, i) => `x${i}`));
     expect(msg.split('\n')[0]).toBe('Admin: x0; x1; x2; x3; +5 dəyişiklik');
     expect(msg).toContain('- x8');
   });
-  it('settings diffs name the field', () => {
-    expect(diffSettings(settings, { ...settings, phone: '+994501234567' })).toEqual(['Ayarlar: Telefon yeniləndi']);
-  });
 });
 
-describe('settings', () => {
+describe('branch settings', () => {
   it.each([
     ['050 123 45 67', '+994501234567'],
     ['+994 50 123 45 67', '+994501234567'],
-    ['994501234567', '+994501234567'],
+    ['010 343 14 13', '+994103431413'],
     ['', ''],
   ])('normalizePhone(%j)', (a, b) => expect(normalizePhone(a)).toBe(b));
-  it('validates formats', () => {
-    expect(validateSettings(settings)).toEqual({});
-    const bad = validateSettings({ ...settings, phone: '12345', social: { ...settings.social, instagram: 'instagram.com/x' }, analytics: { ga4Id: 'UA-1', metaPixelId: 'abc' } });
-    expect(Object.keys(bad).sort()).toEqual(['ga4Id', 'instagram', 'metaPixelId', 'phone']);
+  it.each([
+    ['40.374861, 49.977472', { lat: 40.374861, lng: 49.977472 }],
+    ['https://www.google.com/maps/@40.4093,49.8671,15z', { lat: 40.4093, lng: 49.8671 }],
+    ['nope', null],
+  ])('parseGeo(%j)', (a, b) => expect(parseGeo(a)).toEqual(b));
+  it('validates a branch', () => {
+    const b = data.branches.branches[1];
+    expect(validateBranchInfo(b)).toEqual({});
+    expect(Object.keys(validateBranchInfo({ ...b, phone: '123', geo: { lat: 99, lng: 0 }, hours: { open: '25:00', close: '05:00' } })).sort()).toEqual(['geo', 'hours', 'phone']);
+  });
+  it('validates global settings', () => {
+    expect(validateSettings(data.settings)).toEqual({});
+    const bad = validateSettings({ ...data.settings, social: { ...data.settings.social, instagram: 'instagram.com/x' }, analytics: { ga4Id: 'UA-1', metaPixelId: 'abc' } });
+    expect(Object.keys(bad).sort()).toEqual(['ga4Id', 'instagram', 'metaPixelId']);
   });
 });

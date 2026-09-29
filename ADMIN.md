@@ -6,6 +6,24 @@ Paneldə etdiyiniz dəyişikliklər əvvəlcə **qaralama** kimi saxlanılır v�
 
 ---
 
+## 3 filial: nə ümumidir, nə filiala aiddir
+
+| Bütün filiallar üçün **ümumi** | Hər filial üçün **ayrı** |
+|---|---|
+| Məhsulun adı, fotosu, kateqoriyası, etiketləri, ümumi tərkibi | Qiymət, köhnə qiymət (endirim), "bitib" |
+| | Məhsulun həmin filialda satılıb-satılmaması |
+| | Filiala xas tərkib (məs. 4-cü mkr burgerləri) |
+| | Menyudakı sıra |
+| | Telefon, WhatsApp, ünvan, xəritə, iş saatları, QR kod |
+
+**Menyu** ekranının yuxarısında filial seçicisi var: **📍 Günəşli | 📍 Nərimanov | 📍 4-cü mikrorayon**. Cədvəl seçilmiş filialın qiymətlərini göstərir və dəyişir. Seçim yadda qalır.
+
+**"Bitib"** ilə **"Bu filialda satılmır"** fərqlidir:
+- **Bitib:** məhsul menyuda qalır, saytdan müvəqqəti gizlənir. Qurtaranda istifadə edin.
+- **Satılmır:** məhsul bu filialın menyusundan çıxarılır. Məsələn, Nərimanovda izqara yoxdur.
+
+---
+
 ## Giriş
 
 1. Ünvanı açın və parolu yazın.
@@ -17,6 +35,7 @@ Paneldə etdiyiniz dəyişikliklər əvvəlcə **qaralama** kimi saxlanılır v�
 ## Kompüterdə
 
 ### Qiyməti dəyişmək
+- Əvvəlcə yuxarıdan **filialı seçin**. Qiymət yalnız həmin filialda dəyişir.
 - Cədvəldə qiymət xanasına klik edin, yeni qiyməti yazın və **Enter** basın. Vergül də olar: `5,80`.
 - **Enter** basanda kursor avtomatik olaraq aşağıdakı məhsulun qiymət xanasına keçir. Bütün kateqoriyanın qiymətlərini Excel-dəki kimi ardıcıl yaza bilərsiniz. **↑** bir sətir yuxarı qayıdır, **Esc** yazdığınızı ləğv edir.
 - **Köhnə qiymət** sütunu endirim üçündür. Onu yazsanız, saytda köhnə qiymət üstündən xətt çəkilmiş göstərilir və "X ₼ qənaət" yazılır. Xananı boşaltsanız, endirim silinir.
@@ -25,24 +44,42 @@ Paneldə etdiyiniz dəyişikliklər əvvəlcə **qaralama** kimi saxlanılır v�
 ### Toplu qiymət dəyişikliyi
 1. Yuxarıda **± Toplu qiymət** düyməsini basın.
 2. Qiyməti dəyişəcək məhsulları seçin: bütün kateqoriya və ya əvvəlcədən checkbox ilə seçdiyiniz məhsullar.
-3. Məbləği yazın, məsələn `0.50` və ya `10`, sonra **₼** və ya **%** seçin. Endirim üçün mənfi rəqəm yazın: `-5`.
-4. Cədvəldə köhnə və yeni qiymətlərə baxın. İstəsəniz, **0.10-a yuvarlaqlaşdır** seçimini işarələyin.
-5. **"N qiyməti dəyiş"** düyməsini basın.
+3. **Hansı filiallarda** dəyişəcəyini işarələyin. Seçilmiş filial avtomatik işarələnir, istəsəniz üçünü də seçə bilərsiniz.
+4. Məbləği yazın, məsələn `0.50` və ya `10`, sonra **₼** və ya **%** seçin. Endirim üçün mənfi rəqəm yazın: `-5`.
+5. Cədvəldə köhnə və yeni qiymətlərə baxın. Bir neçə filial seçilibsə, hər sətrin əvvəlində filial adı yazılır. İstəsəniz, **0.10-a yuvarlaqlaşdır** seçimini işarələyin.
+6. **"N qiyməti dəyiş"** düyməsini basın.
 
 ### Bir neçə məhsulu birdən dəyişmək
-Sol tərəfdəki checkbox-larla məhsulları seçin. Yuxarıda çıxan paneldən bunları edə bilərsiniz: **Bitib et**, **Mövcud et**, **Kateqoriyanı dəyiş**, **± Qiymət**, **Sil**.
+Sol tərəfdəki checkbox-larla məhsulları seçin. Yuxarıda çıxan paneldən bunları edə bilərsiniz: **Bitib et**, **Mövcud et**, **Kateqoriyanı dəyiş** (bütün filiallarda), **± Qiymət**, **Bu filialdan çıxar**.
 
-### Yeni məhsul
+### Filialları müqayisə
+Sol menyuda **⚖️ Müqayisə** bölməsi var. Burada hər məhsulun 3 filialdakı qiyməti yan-yana göstərilir.
+- **Yalnız fərqli olanlar** işarələnəndə yalnız qiyməti filiallar arasında fərqli olan məhsullar qalır.
+- Qiyməti birbaşa bu cədvəldə dəyişmək olar (Enter / ↑ ↓ ilə).
+- **Boş xana (—)** həmin filialda satılmır deməkdir. Ora qiymət yazsanız, məhsul həmin filialın menyusuna əlavə olunur. Qiyməti silsəniz, təsdiqdən sonra menyudan çıxarılır.
+
+### Başqa filialda olan məhsulu bu filiala əlavə etmək
+Menyu cədvəlinin üstündə **"▸ Nərimanov filialında satılmayan məhsullar (27)"** yazısı var. Onu açın, məhsulun yanında **+ Nərimanov menyusuna** basın və qiyməti yazın. Pəncərədə digər filiallardakı qiymət göstərilir.
+
+### Yeni məhsul və məhsulu redaktə etmək
 1. **+ Yeni məhsul** düyməsini (və ya klaviaturada `N`) basın.
-2. Ad (AZ) və qiymət məcburidir, qalan sahələr istəyə bağlıdır. RU/EN ad boş qalsa, saytda AZ ad göstərilir.
+2. Ad (AZ) məcburidir, qalan sahələr istəyə bağlıdır. RU/EN ad boş qalsa, saytda AZ ad göstərilir. Ad, foto, kateqoriya, etiketlər və tərkib **3 filialın hamısına aiddir**.
+3. **Filiallar və qiymətlər** bölməsində hər filial üçün ayrıca blok var:
+   - **Bu filialda satılır** açarı. Yeni məhsulda seçdiyiniz filial artıq yandırılmış olur.
+   - **Qiymət** (məcburi) və **köhnə qiymət** (endirim üçün).
+   - **Mövcuddur / Bitib**.
+   - **Bu filialda fərqli tərkib**: işarələsəniz, həmin filial üçün ayrıca tərkib yaza bilərsiniz.
+   - **⇉ Hamısına eyni qiymət** düyməsi seçilmiş filialın qiymətini digər filiallara köçürür və onları da "satılır" edir.
 3. **Foto** üçün şəkli qutuya sürükləyib atın və ya **📷 Foto seç** düyməsini basın. Şəkil avtomatik kiçildilir, böyük faylı özünüz kiçiltməyə ehtiyac yoxdur.
-4. Sağ tərəfdə kartın saytda necə görünəcəyi göstərilir.
+4. Sağ tərəfdə kartın seçilmiş filialın saytında necə görünəcəyi göstərilir.
 5. **Yadda saxla** (və ya `Ctrl+S`) basın.
 
-Oxşar məhsulu tez yaratmaq üçün mövcud məhsulu açıb **⧉ Kopyala** düyməsini basın.
+**🗑 Hər yerdən sil** məhsulu bütün filiallardan və kataloqdan silir. Yalnız bir filialdan çıxarmaq üçün həmin filialın "Bu filialda satılır" açarını söndürün və ya cədvəldəki 🗑 düyməsini basın (**Bu filialdan çıxar**).
+
+Oxşar məhsulu tez yaratmaq üçün mövcud məhsulu açıb **⧉ Kopyala** düyməsini basın. Kopyaya bütün filialların qiymətləri də keçir.
 
 ### Sıralama
-Sətrin solundakı **⋮⋮** işarəsindən tutub məhsulu kateqoriya daxilində yuxarı və ya aşağı sürükləyin.
+Sətrin solundakı **⋮⋮** işarəsindən tutub məhsulu kateqoriya daxilində yuxarı və ya aşağı sürükləyin. Sıra hər filialda ayrıdır.
 
 ### Qısayollar
 | Düymə | Nə edir |
@@ -56,6 +93,7 @@ Sətrin solundakı **⋮⋮** işarəsindən tutub məhsulu kateqoriya daxilind�
 
 ## Telefonda
 
+- **Filial seçmək:** yuxarıdakı **📍 Günəşli | Nərimanov | 4-cü mikrorayon** düymələri.
 - **"Bitib" etmək:** məhsulun yanındakı yaşıl açarı basın, açar boz olur. Məhsul saytdan gizlənir, amma silinmir. Yenidən basanda geri qayıdır.
 - **Qiyməti dəyişmək:** qiymət xanasına toxunun, rəqəm klaviaturası açılır. Yazın və **Enter** basın.
 - **Yeni məhsul:** sağ aşağıdakı sarı **+** düyməsini basın. Foto üçün kamera ilə çəkə və ya qalereyadan seçə bilərsiniz.
@@ -78,16 +116,20 @@ Siz redaktə edərkən menyu başqa cihazdan yayımlanıb. Panel heç nəyin üz
 
 ## Tarixçə və geri qaytarma
 
-**Tarixçə** bölməsində son 30 dəyişiklik görünür: tarix, kim etdi və nə dəyişdi. Səhv bir şey yayımlasanız, səhvdən əvvəlki versiyanın yanındakı **↺ Bu versiyaya qayıt** düyməsini basın. Geri qaytarma da tarixçədə yeni qeyd kimi saxlanılır, yəni onu da geri qaytarmaq olar.
+**Tarixçə** bölməsində son 30 dəyişiklik görünür: tarix, kim etdi və nə dəyişdi. Filiala aid dəyişikliklərin əvvəlində filialın adı yazılır, məsələn "Nərimanov: Çizburger 5.80→6.20". Səhv bir şey yayımlasanız, səhvdən əvvəlki versiyanın yanındakı **↺ Bu versiyaya qayıt** düyməsini basın. Bu düymə **bütün filialların menyularını və qiymətlərini** həmin vəziyyətə qaytarır. Telefonlar, ünvanlar və digər ayarlar dəyişmir. Geri qaytarma da tarixçədə yeni qeyd kimi saxlanılır, yəni onu da geri qaytarmaq olar. Filiallar əlavə olunmazdan əvvəlki versiyalara qayıtmaq olmur.
 
 ---
 
 ## Ayarlar
 
-Burada telefon, WhatsApp, Instagram/TikTok/Facebook, Wolt/Bolt linkləri və analitika ID-ləri yazılır.
-- Nömrəni istənilən formatda yaza bilərsiniz (`050 123 45 67`), panel onu özü `+994501234567` formatına çevirir.
-- **Zəngi test et** və **WhatsApp-ı test et** düymələri nömrənin düzgün işlədiyini yoxlamaq üçündür.
-- Ayarlar da **Sayta yayımla** ilə yayımlanır.
+Hər filial üçün ayrıca kart var:
+- **Telefon** və **WhatsApp nömrəsi**. Nömrəni istənilən formatda yaza bilərsiniz (`055 541 48 48`), panel onu özü `+994555414848` formatına çevirir. **Zəngi test et** və **WhatsApp-ı test et** düymələri nömrənin işlədiyini yoxlamaq üçündür. Həmin filialın WhatsApp sifarişləri bu nömrəyə gəlir.
+- **Ünvan** (AZ, RU, EN).
+- **Xəritə koordinatı:** Google Maps-da filialın üstünə sağ klik edin, çıxan rəqəmlərə (məs. `40.4093, 49.8671`) klik edib kopyalayın və bura yapışdırın. Google Maps linkini də yapışdırmaq olar. Koordinat olmayan filialda xəritə və "Yol tarifi" gizlidir. Ana səhifədəki "Ən yaxın filial" düyməsi isə ən azı 2 filialın koordinatı olanda görünür.
+- **İş saatları:** gecə yarısından sonra bağlanma da olar (11:00 – 05:00). "İndi açıqdır / Bağlıdır" statusu bu saatlarla hesablanır.
+- **Masalar üçün QR kod:** filialın menyusunu açır. **⬇ Çap üçün yüklə (SVG)** düyməsi ilə yükləyib çap edin. Hər filialın masalarına öz kodunu qoyun.
+
+Kartların altında bütün filiallar üçün ümumi bölmələr var: sosial şəbəkələr, Wolt/Bolt linkləri və analitika ID-ləri. Ayarlar da **Sayta yayımla** ilə yayımlanır.
 
 ---
 
@@ -99,14 +141,18 @@ Burada telefon, WhatsApp, Instagram/TikTok/Facebook, Wolt/Bolt linkləri və ana
 
 **Parolu unutdum.** Developer yeni parol qura bilər (aşağıda "Qurulma" bölməsinə baxın).
 
-**Yeni kateqoriya əlavə etmək istəyirəm.** Bu, hələlik paneldə yoxdur, developerə yazın. Setlərin tərkibi də (səbətdəki "setə keç" təklifi üçün) paneldə dəyişdirilmir.
+**Yeni kateqoriya və ya yeni filial əlavə etmək istəyirəm.** Bu, hələlik paneldə yoxdur, developerə yazın. Setlərin tərkibi də (səbətdəki "setə keç" təklifi üçün) paneldə dəyişdirilmir.
+
+**Köhnə QR kodlar (filiallardan əvvəl çap olunanlar) işləyirmi?** Bəli, onlar Günəşli menyusunu açır. Nərimanov və 4-cü mkr masaları üçün yeni kodları Ayarlardan yükləyin.
 
 ---
 ---
 
 # Qurulma (developer üçün)
 
-Admin panel verilənlər bazası istifadə etmir. "Sayta yayımla" basılanda panel GitHub API ilə `data/menu.json`, `data/settings.json` və yeni fotoları (`public/img/u/`) **bir commit** kimi yazır. Vercel bu commit-i görüb saytı yenidən build edir.
+Admin panel verilənlər bazası istifadə etmir. "Sayta yayımla" basılanda panel GitHub API ilə dəyişən faylları **bir commit** kimi yazır: `data/menu.json` (kataloq), `data/branches/<filial>.json` (filial menyuları), `data/branches.json` (filial məlumatları), `data/settings.json` və yeni fotolar (`public/img/u/`). Vercel bu commit-i görüb saytı yenidən build edir.
+
+Filiallar üçün **yeni env dəyişəni lazım deyil**. Əvvəlki quraşdırma olduğu kimi işləyir.
 
 ## 1. GitHub token
 

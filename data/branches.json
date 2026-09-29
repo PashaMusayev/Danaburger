@@ -1,0 +1,67 @@
+{
+  "branches": [
+    {
+      "id": "gunesli",
+      "name": {
+        "az": "Günəşli",
+        "ru": "Гюнешли",
+        "en": "Gunashli"
+      },
+      "address": {
+        "az": "Günəşli, Bakı",
+        "ru": "Гюнешли, Баку",
+        "en": "Gunashli, Baku"
+      },
+      "geo": {
+        "lat": 40.374861,
+        "lng": 49.977472
+      },
+      "hours": {
+        "open": "11:00",
+        "close": "05:00"
+      },
+      "phone": "+994555660110",
+      "whatsapp": "+994555660110"
+    },
+    {
+      "id": "narimanov",
+      "name": {
+        "az": "Nərimanov",
+        "ru": "Нариманов",
+        "en": "Narimanov"
+      },
+      "address": {
+        "az": "Nərimanov, Bakı",
+        "ru": "Нариманов, Баку",
+        "en": "Narimanov, Baku"
+      },
+      "geo": null,
+      "hours": {
+        "open": "11:00",
+        "close": "05:00"
+      },
+      "phone": "+994555414848",
+      "whatsapp": "+994555414848"
+    },
+    {
+      "id": "4-mkr",
+      "name": {
+        "az": "4-cü mikrorayon",
+        "ru": "4-й микрорайон",
+        "en": "4th Microdistrict"
+      },
+      "address": {
+        "az": "4-cü mikrorayon, Bakı",
+        "ru": "4-й микрорайон, Баку",
+        "en": "4th Microdistrict, Baku"
+      },
+      "geo": null,
+      "hours": {
+        "open": "11:00",
+        "close": "05:00"
+      },
+      "phone": "+994103431413",
+      "whatsapp": "+994103431413"
+    }
+  ]
+}

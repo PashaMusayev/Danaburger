@@ -4,18 +4,18 @@ import Menu from '@/components/Menu';
 import OpenBadge from '@/components/OpenBadge';
 import BottomBar from '@/components/BottomBar';
 import Sheets from '@/components/LazySheets';
+import { branchMetadata } from '../meta';
 
-// Public pages are built once per deploy; the admin panel triggers a new deploy on publish.
 export const dynamic = 'force-static';
 
-export const metadata: Metadata = {
-  title: 'Menyu — Dana Burger',
-  description: 'Dana Burger menyusu: burgerlər, şaurma, izqara, pizza, pide, setlər və içkilər. Qiymətlər AZN ilə.',
-  alternates: { canonical: '/menu/' },
-};
+type Props = { params: Promise<{ branch: string }> };
 
-// Target of the table QR codes: straight to the menu, no hero.
-export default function MenuPage() {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return branchMetadata((await params).branch, 'Menyu');
+}
+
+// Target of the branch's table QR codes: straight to the menu, no hero.
+export default function BranchMenuPage() {
   return (
     <>
       <Header />

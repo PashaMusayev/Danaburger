@@ -1,4 +1,4 @@
-import { items, itemById, type MenuItem } from './menu';
+import type { BranchMenu, MenuItem } from './menu';
 
 export type CartLine = { id: string; qty: number };
 
@@ -6,30 +6,27 @@ const FOOD = new Set(['burgers', 'signature', 'shawarma', 'grill', 'pizza', 'pid
 const DRINK = new Set(['drinks', 'coffee', 'fresh']);
 const MEALS = new Set(['sets', 'combos', 'breakfast']);
 
-// Only offer a combo when every slot can still be filled from what's on sale
-// (a component may be marked "bitib" or deleted in the admin panel).
-const combos = items
-  .filter((i) => i.includes?.length)
-  .map((c) => ({ ...c, includes: c.includes!.map((s) => ({ ...s, anyOf: s.anyOf.filter((id) => itemById.has(id)) })) }))
-  .filter((c) => c.includes.every((s) => s.anyOf.length > 0));
+// Every function takes the branch's menu: prices, what's on sale and which combos can be completed differ per branch.
 
-export const lineTotal = (l: CartLine) => (itemById.get(l.id)?.price ?? 0) * l.qty;
-export const cartTotal = (cart: CartLine[]) => cart.reduce((s, l) => s + lineTotal(l), 0);
+export const lineTotal = (m: BranchMenu, l: CartLine) => (m.itemById.get(l.id)?.price ?? 0) * l.qty;
+export const cartTotal = (m: BranchMenu, cart: CartLine[]) => cart.reduce((s, l) => s + lineTotal(m, l), 0);
 
-const catOf = (l: CartLine) => itemById.get(l.id)?.category ?? '';
+const catOf = (m: BranchMenu, l: CartLine) => m.itemById.get(l.id)?.category ?? '';
 
-export function suggestDrinks(cart: CartLine[]): MenuItem[] {
-  const hasFood = cart.some((l) => FOOD.has(catOf(l)));
-  const hasDrink = cart.some((l) => DRINK.has(catOf(l)) || MEALS.has(catOf(l)));
+export function suggestDrinks(m: BranchMenu, cart: CartLine[]): MenuItem[] {
+  const hasFood = cart.some((l) => FOOD.has(catOf(m, l)));
+  const hasDrink = cart.some((l) => DRINK.has(catOf(m, l)) || MEALS.has(catOf(m, l)));
   if (!hasFood || hasDrink) return [];
-  return ['kola-05', 'ayran', 'kola-03'].map((id) => itemById.get(id)!).filter(Boolean);
+  return ['kola-05', 'ayran', 'kola-03'].map((id) => m.itemById.get(id)!).filter(Boolean);
 }
 
-export function suggestSauces(cart: CartLine[]): MenuItem[] {
-  const hasFood = cart.some((l) => FOOD.has(catOf(l)));
-  const hasSauce = cart.some((l) => catOf(l) === 'sauces');
+/** Empty at a branch that sells no sauces. */
+export function suggestSauces(m: BranchMenu, cart: CartLine[]): MenuItem[] {
+  const hasFood = cart.some((l) => FOOD.has(catOf(m, l)));
+  const hasSauce = cart.some((l) => catOf(m, l) === 'sauces');
   if (!hasFood || hasSauce) return [];
-  return ['sous-pendirli', 'sous-sarimsaqli', 'sous-barbekyu'].map((id) => itemById.get(id)!).filter(Boolean);
+  const preferred = ['sous-pendirli', 'sous-sarimsaqli', 'sous-barbekyu'].map((id) => m.itemById.get(id)).filter(Boolean) as MenuItem[];
+  return preferred.length ? preferred : m.sauces.slice(0, 3);
 }
 
 type Match = {
@@ -40,7 +37,7 @@ type Match = {
 };
 
 /** Greedily fills each combo slot from what's already in the cart. */
-function match(combo: MenuItem, cart: CartLine[]): Match {
+function match(m: BranchMenu, combo: MenuItem, cart: CartLine[]): Match {
   const left = new Map(cart.map((l) => [l.id, l.qty]));
   const used = new Map<string, number>();
   const missing: Match['missing'] = [];
@@ -56,10 +53,10 @@ function match(combo: MenuItem, cart: CartLine[]): Match {
       }
       if (!need) break;
     }
-    if (need) missing.push({ item: itemById.get(slot.anyOf[0])!, qty: need });
+    if (need) missing.push({ item: m.itemById.get(slot.anyOf[0])!, qty: need });
   }
   const usedLines = [...used].map(([id, qty]) => ({ id, qty }));
-  return { combo, used: usedLines, usedCost: cartTotal(usedLines), missing };
+  return { combo, used: usedLines, usedCost: cartTotal(m, usedLines), missing };
 }
 
 export type ComboOffer =
@@ -70,13 +67,13 @@ export type ComboOffer =
  * "swap": the cart already contains everything in a combo, so swapping saves money.
  * "near": one unit is missing; completing the combo costs less than buying that item alone.
  */
-export function bestComboOffer(cart: CartLine[]): ComboOffer | null {
+export function bestComboOffer(menu: BranchMenu, cart: CartLine[]): ComboOffer | null {
   let swap: ComboOffer | null = null;
   let near: ComboOffer | null = null;
   let swapBest = 0.009;
   let nearBest = 0.009;
-  for (const combo of combos) {
-    const m = match(combo, cart);
+  for (const combo of menu.combos) {
+    const m = match(menu, combo, cart);
     const missingUnits = m.missing.reduce((s, x) => s + x.qty, 0);
     if (missingUnits === 0) {
       const save = m.usedCost - combo.price;

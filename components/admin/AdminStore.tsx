@@ -1,19 +1,20 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { MenuData } from '@/lib/menu';
-import type { Settings } from '@/lib/config';
-import { diffMenu, diffSettings } from '@/lib/admin/diff';
-import { validateMenu } from '@/lib/admin/validate';
-import { validateSettings } from '@/lib/admin/settings';
+import { diffData } from '@/lib/admin/diff';
+import { validateData } from '@/lib/admin/validate';
+import type { AdminData } from '@/lib/admin/model';
 
-const DRAFT_KEY = 'db.admin.draft.v1';
+// v2: the draft is the whole AdminData (catalog + branches + branch menus + settings)
+const DRAFT_KEY = 'db.admin.draft.v2';
+const BRANCH_KEY = 'db.admin.branch';
 const LIVE_POLL_MS = 5000;
 const LIVE_TIMEOUT_MS = 4 * 60 * 1000;
 
-type Base = { menu: MenuData; menuSha: string; settings: Settings; settingsSha: string };
-type Draft = { menu: MenuData; settings: Settings };
-type StoredDraft = Draft & { baseMenuSha: string; baseSettingsSha: string; images: Record<string, string>; changes: string[] };
+type Shas = Record<string, string>;
+type Base = { data: AdminData; shas: Shas };
+type StoredDraft = { data: AdminData; baseShas: Shas; images: Record<string, string>; changes: string[] };
+const sameShas = (a: Shas, b: Shas) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 
 export type PublishPhase =
   | { kind: 'idle' }
@@ -31,10 +32,13 @@ type Store = {
   status: 'loading' | 'ready' | 'error';
   loadError: string | null;
   base: Base | null;
-  menu: MenuData;
-  settings: Settings;
-  setMenu: (fn: (m: MenuData) => MenuData) => void;
-  setSettings: (s: Settings) => void;
+  /** the draft being edited */
+  data: AdminData;
+  update: (fn: (d: AdminData) => AdminData) => void;
+  /** the branch the Menyu screen shows (remembered per device) */
+  branch: string;
+  setBranch: (id: string) => void;
+  branchIds: string[];
   images: Record<string, string>;
   addImage: (path: string, dataUrl: string) => void;
   srcFor: (image?: string) => string | undefined;
@@ -101,7 +105,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Store['status']>('loading');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [base, setBase] = useState<Base | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<AdminData | null>(null);
+  const [branch, setBranchState] = useState<string>('gunesli');
   const [images, setImages] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState<Store['conflict']>(null);
   const [phase, setPhase] = useState<PublishPhase>({ kind: 'idle' });
@@ -136,14 +141,21 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       const stored = keepDraft ? readStored() : null;
       setBase(st);
       setConflict(null);
-      if (stored && stored.baseMenuSha === st.menuSha && stored.baseSettingsSha === st.settingsSha) {
-        setDraft({ menu: stored.menu, settings: stored.settings });
+      const ids = st.data.branches.branches.map((b) => b.id);
+      try {
+        const saved = localStorage.getItem(BRANCH_KEY);
+        setBranchState(saved && ids.includes(saved) ? saved : ids[0]);
+      } catch {
+        setBranchState(ids[0]);
+      }
+      if (stored && sameShas(stored.baseShas, st.shas)) {
+        setDraft(stored.data);
         setImages(stored.images ?? {});
       } else {
         // A draft is only stored while it has edits. It was made against an older menu, so it can't be
         // published as is: list what the owner had changed so they can redo it.
         if (stored?.changes?.length) setConflict({ changes: stored.changes });
-        setDraft({ menu: st.menu, settings: st.settings });
+        setDraft(st.data);
         setImages({});
       }
       setStatus('ready');
@@ -158,23 +170,17 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     reload();
   }, [reload]);
 
-  const changes = useMemo(
-    () => (base && draft ? [...diffMenu(base.menu, draft.menu), ...diffSettings(base.settings, draft.settings)] : []),
-    [base, draft],
-  );
-  const problems = useMemo(() => {
-    if (!draft) return [];
-    return [...validateMenu(draft.menu), ...Object.values(validateSettings(draft.settings)).map((e) => `Ayarlar: ${e}`)];
-  }, [draft]);
+  const changes = useMemo(() => (base && draft ? diffData(base.data, draft) : []), [base, draft]);
+  const problems = useMemo(() => (draft ? validateData(draft) : []), [draft]);
 
   // Persist the draft so closing the tab never loses work.
   const persist = useCallback(
-    (d: Draft | null, imgs: Record<string, string>) => {
+    (d: AdminData | null, imgs: Record<string, string>) => {
       if (!base || !d) return;
-      const list = [...diffMenu(base.menu, d.menu), ...diffSettings(base.settings, d.settings)];
+      const list = diffData(base.data, d);
       try {
         if (!list.length) return localStorage.removeItem(DRAFT_KEY);
-        const stored: StoredDraft = { ...d, baseMenuSha: base.menuSha, baseSettingsSha: base.settingsSha, images: imgs, changes: list };
+        const stored: StoredDraft = { data: d, baseShas: base.shas, images: imgs, changes: list };
         try {
           localStorage.setItem(DRAFT_KEY, JSON.stringify(stored));
         } catch {
@@ -221,9 +227,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       toast('Əvvəlcə səhvləri düzəldin: ' + problems[0], 'error');
       return;
     }
-    const menuChanged = diffMenu(base.menu, draft.menu).length > 0;
-    const settingsChanged = diffSettings(base.settings, draft.settings).length > 0;
-    const used = new Set(draft.menu.items.map((i) => i.image).filter(Boolean) as string[]);
+    const used = new Set(draft.catalog.items.map((i) => i.image).filter(Boolean) as string[]);
     const toUpload = Object.entries(images).filter(([path]) => used.has(path.replace(/^public/, '')));
     try {
       const uploaded: { path: string; sha: string }[] = [];
@@ -233,14 +237,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         uploaded.push({ path, sha });
       }
       setPhase({ kind: 'committing' });
-      const res = await api<{ commitSha: string; menuSha: string; settingsSha: string }>('publish', {
-        baseMenuSha: base.menuSha,
-        baseSettingsSha: base.settingsSha,
-        ...(menuChanged && { menu: draft.menu }),
-        ...(settingsChanged && { settings: draft.settings }),
-        images: uploaded,
-      });
-      setBase({ menu: draft.menu, menuSha: res.menuSha, settings: draft.settings, settingsSha: res.settingsSha });
+      const res = await api<{ commitSha: string; shas: Shas }>('publish', { baseShas: base.shas, data: draft, images: uploaded });
+      setBase({ data: draft, shas: res.shas });
       try {
         localStorage.removeItem(DRAFT_KEY);
       } catch {
@@ -271,7 +269,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const discard = useCallback(() => {
     if (!base) return;
-    setDraft({ menu: base.menu, settings: base.settings });
+    setDraft(base.data);
     setConflict(null);
     try {
       localStorage.removeItem(DRAFT_KEY);
@@ -285,10 +283,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       status,
       loadError,
       base,
-      menu: draft?.menu ?? ({ currency: 'AZN', categories: [], items: [] } as MenuData),
-      settings: draft?.settings ?? (base?.settings as Settings),
-      setMenu: (fn) => setDraft((d) => (d ? { ...d, menu: fn(d.menu) } : d)),
-      setSettings: (s) => setDraft((d) => (d ? { ...d, settings: s } : d)),
+      data: (draft ?? base?.data)!,
+      update: (fn) => setDraft((d) => (d ? fn(d) : d)),
+      branch,
+      setBranch: (id) => {
+        setBranchState(id);
+        try {
+          localStorage.setItem(BRANCH_KEY, id);
+        } catch {
+          /* ignore */
+        }
+      },
+      branchIds: (draft ?? base?.data)?.branches.branches.map((b) => b.id) ?? [],
       images,
       addImage: (path, dataUrl) => setImages((m) => ({ ...m, [path]: dataUrl })),
       // photos uploaded in this session aren't on the live site yet: show the local copy
@@ -307,7 +313,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       confirmReq,
       afterRevert,
     }),
-    [status, loadError, base, draft, images, changes, problems, conflict, discard, reload, publish, phase, saveNow, toasts, toast, confirm, confirmReq, afterRevert],
+    [status, loadError, base, draft, branch, images, changes, problems, conflict, discard, reload, publish, phase, saveNow, toasts, toast, confirm, confirmReq, afterRevert],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

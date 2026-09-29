@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Sheet from './Sheet';
-import { useStore } from '@/lib/store';
-import { fmt, itemById, type MenuItem } from '@/lib/menu';
+import { useBranch, useStore } from '@/lib/store';
+import { fmt, type BranchMenu, type MenuItem } from '@/lib/menu';
 import { applyCombo, bestComboOffer, lineTotal, suggestDrinks, suggestSauces, type CartLine } from '@/lib/upsell';
 import { whatsappHref } from '@/lib/config';
 import { track } from '@/lib/analytics';
@@ -15,17 +15,19 @@ const CUSTOMER_KEY = 'db.customer';
 const azName = (i: MenuItem) =>
   !i.group ? i.name.az : i.category === 'shawarma' ? `${i.name.az} (${i.group.az} şaurma)` : `${i.group.az}: ${i.name.az}`;
 
-function buildMessage(cart: CartLine[], total: number, name: string, address: string, note: string) {
+export function buildMessage(menu: BranchMenu, branchName: string, cart: CartLine[], total: number, name: string, address: string, note: string) {
   const lines = cart.map((l) => {
-    const i = itemById.get(l.id)!;
-    return `• ${l.qty}× ${azName(i)} — ${fmt(lineTotal(l))} ₼`;
+    const i = menu.itemById.get(l.id)!;
+    return `• ${l.qty}× ${azName(i)} — ${fmt(lineTotal(menu, l))} ₼`;
   });
   const extra = [name && `Ad: ${name}`, address && `Ünvan: ${address}`, note && `Qeyd: ${note}`].filter(Boolean);
-  return ['Salam! Sifariş vermək istəyirəm:', '', ...lines, '', `Cəmi: ${fmt(total)} ₼`, ...extra].join('\n');
+  // first line names the branch so an order sent to the wrong number is still obvious
+  return [`Salam! ${branchName} filialına sifariş:`, '', ...lines, '', `Cəmi: ${fmt(total)} ₼`, ...extra].join('\n');
 }
 
 export default function CartSheet() {
   const { cartOpen, setCartOpen, cart, setCart, setQty, add, total, t, locale } = useStore();
+  const { branch, menu } = useBranch();
   const [customer, setCustomer] = useState({ name: '', address: '', note: '' });
 
   useEffect(() => {
@@ -37,19 +39,19 @@ export default function CartSheet() {
     }
   }, []);
 
-  const offer = useMemo(() => bestComboOffer(cart), [cart]);
-  const drinks = useMemo(() => suggestDrinks(cart), [cart]);
-  const sauces = useMemo(() => suggestSauces(cart), [cart]);
+  const offer = useMemo(() => bestComboOffer(menu, cart), [menu, cart]);
+  const drinks = useMemo(() => suggestDrinks(menu, cart), [menu, cart]);
+  const sauces = useMemo(() => suggestSauces(menu, cart), [menu, cart]);
 
   const send = () => {
-    const msg = buildMessage(cart, total, customer.name.trim(), customer.address.trim(), customer.note.trim());
+    const msg = buildMessage(menu, branch.name.az, cart, total, customer.name.trim(), customer.address.trim(), customer.note.trim());
     try {
       localStorage.setItem(CUSTOMER_KEY, JSON.stringify({ name: customer.name, address: customer.address }));
     } catch {
       /* ignore */
     }
-    track('whatsapp_order', { value: Number(total.toFixed(2)), items: cart.reduce((s, l) => s + l.qty, 0) });
-    window.open(whatsappHref(msg), '_blank', 'noopener');
+    track('whatsapp_order', { value: Number(total.toFixed(2)), items: cart.reduce((s, l) => s + l.qty, 0), branch: branch.id });
+    window.open(whatsappHref(branch.whatsapp, msg), '_blank', 'noopener');
   };
 
   return (
@@ -79,7 +81,7 @@ export default function CartSheet() {
           <>
             <ul className="divide-y divide-white/5">
               {cart.map((l) => {
-                const i = itemById.get(l.id)!;
+                const i = menu.itemById.get(l.id)!;
                 return (
                   <li key={l.id} className="flex items-center gap-3 py-3">
                     <div className="min-w-0 flex-1">
@@ -98,7 +100,7 @@ export default function CartSheet() {
                         +
                       </button>
                     </div>
-                    <span className="w-16 text-right font-bold text-gold">{fmt(lineTotal(l))}</span>
+                    <span className="w-16 text-right font-bold text-gold">{fmt(lineTotal(menu, l))}</span>
                   </li>
                 );
               })}

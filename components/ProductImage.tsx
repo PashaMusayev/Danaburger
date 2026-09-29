@@ -1,8 +1,8 @@
 import Image from 'next/image';
 import type { MenuItem } from '@/lib/menu';
-import { categories } from '@/lib/menu';
+import { catalog } from '@/lib/branches';
 
-const icon = (cat: string) => categories.find((c) => c.id === cat)?.icon ?? '🍔';
+const icon = (cat: string) => catalog.categories.find((c) => c.id === cat)?.icon ?? '🍔';
 
 /** Real photo when we have one, otherwise a branded placeholder so the grid never looks broken. */
 export default function ProductImage({

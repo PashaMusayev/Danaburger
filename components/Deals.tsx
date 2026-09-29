@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ProductImage from './ProductImage';
 import SectionTitle from './SectionTitle';
-import { useStore } from '@/lib/store';
-import { deals, fmt, savings, type MenuItem } from '@/lib/menu';
+import { useBranch, useStore } from '@/lib/store';
+import { fmt, savings, type MenuItem } from '@/lib/menu';
 
 export default function Deals() {
   const { t } = useStore();
+  const { deals } = useBranch().menu;
   const [expanded, setExpanded] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState({ first: 1, last: 1, atStart: true, atEnd: false });
@@ -65,6 +66,9 @@ export default function Deals() {
     setExpanded((x) => !x);
     document.getElementById('deals')?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // a branch may have no discounted sets at all
+  if (!deals.length) return null;
 
   return (
     <section id="deals" className="py-16" aria-labelledby="deals-title">

@@ -1,8 +1,7 @@
 import 'server-only';
 import type { AdminEnv } from './env';
 
-export const MENU_PATH = 'data/menu.json';
-export const SETTINGS_PATH = 'data/settings.json';
+import { DATA_DIR } from './model';
 
 /** Someone else changed the file since the panel loaded it. Never overwrite: the owner reloads. */
 export class ConflictError extends Error {}
@@ -47,6 +46,16 @@ const enc = (p: string) => p.split('/').map(encodeURIComponent).join('/');
 export async function readFile(env: AdminEnv, path: string, ref: string): Promise<{ text: string; sha: string }> {
   const r = await gh<{ content: string; sha: string; encoding: string }>(env, `/contents/${enc(path)}?ref=${encodeURIComponent(ref)}`);
   return { text: Buffer.from(r.content, 'base64').toString('utf8'), sha: r.sha };
+}
+
+/** Like readFile, but null when the file doesn't exist at that ref (e.g. a commit from before branches). */
+export async function readFileMaybe(env: AdminEnv, path: string, ref: string): Promise<{ text: string; sha: string } | null> {
+  try {
+    return await readFile(env, path, ref);
+  } catch (e) {
+    if (e instanceof GitHubError && e.status === 404) return null;
+    throw e;
+  }
 }
 
 export async function headSha(env: AdminEnv): Promise<string> {
@@ -100,10 +109,11 @@ export async function commitFiles(
 
 export type HistoryEntry = { sha: string; message: string; date: string; author: string };
 
+/** Commits that touched anything under data/ (menus, prices, branch info, settings). */
 export async function menuHistory(env: AdminEnv, limit = 30): Promise<HistoryEntry[]> {
   const r = await gh<{ sha: string; commit: { message: string; author: { name: string; date: string } } }[]>(
     env,
-    `/commits?sha=${encodeURIComponent(env.branch)}&path=${encodeURIComponent(MENU_PATH)}&per_page=${limit}`,
+    `/commits?sha=${encodeURIComponent(env.branch)}&path=${encodeURIComponent(DATA_DIR)}&per_page=${limit}`,
   );
   return r.map((c) => ({ sha: c.sha, message: c.commit.message, date: c.commit.author.date, author: c.commit.author.name }));
 }

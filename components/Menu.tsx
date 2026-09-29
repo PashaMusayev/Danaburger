@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ProductImage from './ProductImage';
 import SectionTitle from './SectionTitle';
-import { useStore } from '@/lib/store';
-import { categories, items, fmt, type MenuItem, type Tag } from '@/lib/menu';
+import { useBranch, useStore } from '@/lib/store';
+import { fmt, type BranchMenu, type MenuItem, type Tag } from '@/lib/menu';
 
 type Filter = 'chicken' | 'meat' | 'spicy' | 'veg' | 'under10';
 const FILTERS: Filter[] = ['chicken', 'meat', 'spicy', 'veg', 'under10'];
@@ -23,18 +23,21 @@ const norm = (s: string) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '');
 
-const haystack = new Map(
-  items.map((i) => [
-    i.id,
-    norm([i.name.az, i.name.ru, i.name.en, i.group?.az ?? '', i.description, categories.find((c) => c.id === i.category)?.name.az ?? ''].join(' ')),
-  ]),
-);
-
-// Categories with no photos render as a classic printed-menu list instead of photo cards.
-const photoCats = new Set(items.filter((i) => i.image).map((i) => i.category));
+const searchIndex = ({ items, categories }: BranchMenu) =>
+  new Map(
+    items.map((i) => [
+      i.id,
+      norm([i.name.az, i.name.ru, i.name.en, i.group?.az ?? '', i.description, categories.find((c) => c.id === i.category)?.name.az ?? ''].join(' ')),
+    ]),
+  );
 
 export default function Menu({ standalone = false }: { standalone?: boolean }) {
   const { t, locale } = useStore();
+  const { menu } = useBranch();
+  const { items, categories } = menu;
+  const haystack = useMemo(() => searchIndex(menu), [menu]);
+  // Categories with no photos render as a classic printed-menu list instead of photo cards.
+  const photoCats = useMemo(() => new Set(items.filter((i) => i.image).map((i) => i.category)), [items]);
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState<Set<Filter>>(new Set());
   const [active, setActive] = useState(categories[0].id);
@@ -49,14 +52,14 @@ export default function Menu({ standalone = false }: { standalone?: boolean }) {
       }
       return true;
     });
-  }, [q, filters]);
+  }, [q, filters, items, haystack]);
 
   const byCat = useMemo(
     () =>
       categories
         .map((c) => ({ cat: c, list: visible.filter((i) => i.category === c.id) }))
         .filter((x) => x.list.length),
-    [visible],
+    [visible, categories],
   );
 
   // highlight the tab of the section currently on screen

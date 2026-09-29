@@ -5,22 +5,34 @@ import Logo from './Logo';
 import { useStore } from '@/lib/store';
 import type { Locale } from '@/lib/menu';
 import { fmt } from '@/lib/menu';
+import BranchSwitcher from './BranchSwitcher';
 
 const LOCALES: Locale[] = ['az', 'ru', 'en'];
 
 export default function Header() {
-  const { t, locale, setLocale, count, total, setCartOpen } = useStore();
+  const { t, locale, setLocale, count, total, setCartOpen, branch } = useStore();
+  const base = branch ? `/${branch.id}/` : '/';
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-ink/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
-        <Link href="/">
-          <Logo size={38} />
-        </Link>
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <Link href="/">
+            <Logo size={38} compact={!!branch} />
+            {branch && <span className="sr-only sm:hidden">Dana Burger</span>}
+          </Link>
+          {branch && <BranchSwitcher />}
+        </div>
 
         <nav className="hidden items-center gap-6 text-sm font-semibold text-mute md:flex">
-          <a href="/#deals" className="hover:text-cream">{t.nav.deals}</a>
-          <a href="/#menu" className="hover:text-cream">{t.nav.menu}</a>
-          <a href="/#contact" className="hover:text-cream">{t.nav.contact}</a>
+          {branch ? (
+            <>
+              <a href={`${base}#deals`} className="hover:text-cream">{t.nav.deals}</a>
+              <a href={`${base}#menu`} className="hover:text-cream">{t.nav.menu}</a>
+              <a href={`${base}#contact`} className="hover:text-cream">{t.nav.contact}</a>
+            </>
+          ) : (
+            <a href="/#branches" className="hover:text-cream">{t.branches.title}</a>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -38,12 +50,15 @@ export default function Header() {
               </button>
             ))}
           </div>
+          {branch && (
           <button
+            data-testid="cart-button"
             onClick={() => setCartOpen(true)}
             className="hidden items-center gap-2 rounded-full bg-red px-4 py-2 text-sm font-bold text-white transition hover:bg-red-600 md:flex"
           >
             🛒 {count > 0 ? `${count} · ${fmt(total)} ₼` : t.bar.cart}
           </button>
+          )}
         </div>
       </div>
     </header>

@@ -8,7 +8,7 @@ const toMinutes = (hhmm: string) => {
 /** Minutes since midnight in the restaurant's time zone. */
 export function bakuMinutes(now: Date = new Date()): number {
   const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: config.hours.timeZone,
+    timeZone: config.timeZone,
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
@@ -20,11 +20,13 @@ export function bakuMinutes(now: Date = new Date()): number {
 
 export type OpenStatus = { open: boolean; minutesToChange: number };
 
+export type Hours = { open: string; close: string };
+
 /** Handles hours that cross midnight (11:00 → 05:00). */
-export function getOpenStatus(now: Date = new Date()): OpenStatus {
+export function getOpenStatus(hours: Hours, now: Date = new Date()): OpenStatus {
   const t = bakuMinutes(now);
-  const open = toMinutes(config.hours.open);
-  const close = toMinutes(config.hours.close);
+  const open = toMinutes(hours.open);
+  const close = toMinutes(hours.close);
   const day = 24 * 60;
   const crosses = close <= open;
   const isOpen = crosses ? t >= open || t < close : t >= open && t < close;

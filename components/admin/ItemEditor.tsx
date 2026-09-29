@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TAGS, type RawMenuItem, type Tag } from '@/lib/menu';
+import { TAGS, type CatalogItem, type Tag } from '@/lib/menu';
 import { parsePrice, isSuspiciousChange } from '@/lib/admin/price';
-import { addItem, duplicateItem, updateItem } from '@/lib/admin/ops';
-import { duplicateName, validateItem, type FieldErrors } from '@/lib/admin/validate';
+import { addProduct, duplicateProduct, setSold, updateCatalogItem, updateEntry, type NewEntry } from '@/lib/admin/ops';
+import { duplicateName, validateEntry, validateItem, type FieldErrors } from '@/lib/admin/validate';
+import { branchName, type AdminData } from '@/lib/admin/model';
 import { slugify } from '@/lib/admin/slug';
 import { useAdmin } from './AdminStore';
 import { resizeImage } from './image';
 import { Field, Switch, btn, input } from './ui';
 
 export const TAG_LABEL: Record<Tag, string> = { popular: 'Populyar', new: 'Yeni', spicy: 'Acılı', chicken: 'Toyuq', meat: 'Ət', veg: 'Vegetarian' };
+
+/** One branch's part of the form. */
+type BranchForm = { sold: boolean; price: string; oldPrice: string; available: boolean; ownDesc: boolean; description: string };
 
 type Form = {
   category: string;
@@ -19,26 +23,44 @@ type Form = {
   ru: string;
   en: string;
   description: string;
-  price: string;
-  oldPrice: string;
   tags: Tag[];
-  available: boolean;
   image: string;
+  branches: Record<string, BranchForm>;
 };
 
-const toForm = (i?: RawMenuItem, category = 'burgers'): Form => ({
-  category: i?.category ?? category,
-  group: i?.group?.az ?? '',
-  az: i?.name.az ?? '',
-  ru: i?.name.ru ?? '',
-  en: i?.name.en ?? '',
-  description: i?.description ?? '',
-  price: i ? i.price.toFixed(2) : '',
-  oldPrice: i?.oldPrice !== undefined ? i.oldPrice.toFixed(2) : '',
-  tags: i?.tags ?? [],
-  available: i?.available ?? true,
-  image: i?.image ?? '',
-});
+const money = (n?: number) => (n === undefined ? '' : n.toFixed(2));
+
+function toForm(d: AdminData, i: CatalogItem | undefined, category: string, currentBranch: string): Form {
+  return {
+    category: i?.category ?? category,
+    group: i?.group?.az ?? '',
+    az: i?.name.az ?? '',
+    ru: i?.name.ru ?? '',
+    en: i?.name.en ?? '',
+    description: i?.description ?? '',
+    tags: i?.tags ?? [],
+    image: i?.image ?? '',
+    branches: Object.fromEntries(
+      Object.entries(d.menus).map(([b, m]) => {
+        const e = i && m.items.find((x) => x.id === i.id);
+        return [
+          b,
+          {
+            // a new product starts as sold at the branch the owner is looking at
+            sold: e ? true : !i && b === currentBranch,
+            price: money(e?.price),
+            oldPrice: money(e?.oldPrice),
+            available: e?.available ?? true,
+            ownDesc: e?.description !== undefined,
+            description: e?.description ?? '',
+          },
+        ];
+      }),
+    ),
+  };
+}
+
+type Errors = FieldErrors & Partial<Record<`${string}.price` | `${string}.oldPrice`, string>>;
 
 /** Opens as a right-hand panel on desktop and a full-screen sheet on phones. */
 export default function ItemEditor({
@@ -54,81 +76,127 @@ export default function ItemEditor({
   onDelete: (ids: string[]) => void;
   onOpen: (id: string) => void;
 }) {
-  const { menu, setMenu, toast, confirm, addImage, srcFor } = useAdmin();
-  const existing = id === 'new' ? undefined : menu.items.find((i) => i.id === id);
-  const [f, setF] = useState<Form>(() => toForm(existing, defaultCategory));
-  const [errors, setErrors] = useState<FieldErrors>({});
+  const { data, update, branch: current, toast, confirm, addImage, srcFor } = useAdmin();
+  const existing = id === 'new' ? undefined : data.catalog.items.find((i) => i.id === id);
+  const [f, setF] = useState<Form>(() => toForm(data, existing, defaultCategory ?? 'burgers', current));
+  const [errors, setErrors] = useState<Errors>({});
   const [busyImg, setBusyImg] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setF(toForm(existing, defaultCategory));
+    setF(toForm(data, existing, defaultCategory ?? 'burgers', current));
     setErrors({});
     firstRef.current?.focus();
     // re-init only when switching to another item
   }, [id]);
 
-  const cats = menu.categories;
+  const cats = data.catalog.categories;
+  const branchIds = Object.keys(data.menus);
   const groups = useMemo(() => {
-    const seen = new Map<string, RawMenuItem['group']>();
-    for (const i of menu.items) if (i.category === f.category && i.group) seen.set(i.group.az, i.group);
+    const seen = new Map<string, CatalogItem['group']>();
+    for (const i of data.catalog.items) if (i.category === f.category && i.group) seen.set(i.group.az, i.group);
     return [...seen.values()];
-  }, [menu.items, f.category]);
+  }, [data.catalog.items, f.category]);
 
-  const build = (): RawMenuItem | null => {
-    const price = parsePrice(f.price);
-    const oldPrice = f.oldPrice.trim() ? parsePrice(f.oldPrice) : undefined;
+  const build = (): { item: CatalogItem; entries: Record<string, NewEntry | null> } | null => {
     const group = groups.find((g) => g?.az === f.group);
-    const item: RawMenuItem = {
+    const item: CatalogItem = {
       id: existing?.id ?? '__new__',
       category: f.category,
       ...(group && { group }),
       name: { az: f.az.trim(), ru: f.ru.trim(), en: f.en.trim() },
       description: f.description.trim(),
-      price: price ?? NaN,
-      ...(oldPrice !== undefined && { oldPrice: oldPrice ?? NaN }),
       ...(f.image && { image: f.image }),
       tags: f.tags,
-      available: f.available,
       ...(existing?.includes && { includes: existing.includes }),
     };
-    const e = validateItem(item, new Set(cats.map((c) => c.id)));
-    if (f.price.trim() && price === null) e.price = 'Qiymət düzgün deyil. Nümunə: 5.80';
-    if (!f.price.trim()) e.price = 'Qiymət yazın.';
+    const e: Errors = validateItem(item, new Set(cats.map((c) => c.id)));
+    const entries: Record<string, NewEntry | null> = {};
+    for (const [b, bf] of Object.entries(f.branches)) {
+      if (!bf.sold) {
+        entries[b] = null;
+        continue;
+      }
+      const price = parsePrice(bf.price);
+      const oldPrice = bf.oldPrice.trim() ? parsePrice(bf.oldPrice) : undefined;
+      if (!bf.price.trim()) e[`${b}.price`] = 'Qiymət yazın.';
+      else if (price === null) e[`${b}.price`] = 'Qiymət düzgün deyil. Nümunə: 5.80';
+      if (oldPrice === null) e[`${b}.oldPrice`] = 'Köhnə qiymət düzgün deyil.';
+      else if (price !== null && oldPrice !== undefined) {
+        const v = validateEntry({ price, oldPrice });
+        if (v.oldPrice) e[`${b}.oldPrice`] = v.oldPrice;
+      }
+      entries[b] = {
+        price: price ?? NaN,
+        ...(oldPrice != null && { oldPrice }),
+        available: bf.available,
+        ...(bf.ownDesc && { description: bf.description.trim() }),
+      };
+    }
     setErrors(e);
-    return Object.keys(e).length ? null : item;
+    return Object.keys(e).length ? null : { item, entries };
   };
 
   const save = async () => {
-    const item = build();
-    if (!item) {
+    const built = build();
+    if (!built) {
       toast('Formada səhvlər var.', 'error');
       return;
     }
-    if (duplicateName(item, menu.items)) {
+    const { item, entries } = built;
+    if (duplicateName(item, data.catalog.items)) {
       const ok = await confirm({ title: 'Eyni adda məhsul var', body: `Bu kateqoriyada artıq "${item.name.az}" var. Yenə də saxlanılsın?`, ok: 'Saxla' });
       if (!ok) return;
     }
-    if (existing && isSuspiciousChange(existing.price, item.price)) {
-      const ok = await confirm({ title: 'Qiymət çox dəyişir', body: `${existing.price.toFixed(2)} → ${item.price.toFixed(2)} ₼. Əminsiniz?`, ok: 'Bəli, dəyiş' });
-      if (!ok) return;
-    }
     if (existing) {
+      for (const [b, e] of Object.entries(entries)) {
+        const before = data.menus[b].items.find((x) => x.id === existing.id);
+        if (e && before && isSuspiciousChange(before.price, e.price)) {
+          const ok = await confirm({ title: 'Qiymət çox dəyişir', body: `${branchName(data, b)}: ${before.price.toFixed(2)} → ${e.price.toFixed(2)} ₼. Əminsiniz?`, ok: 'Bəli, dəyiş' });
+          if (!ok) return;
+        }
+      }
       const { id: _, ...patch } = item;
       void _;
-      setMenu((m) =>
-        updateItem(m, existing.id, { ...patch, group: item.group, oldPrice: item.oldPrice, image: item.image }),
-      );
+      update((d) => {
+        let out = updateCatalogItem(d, existing.id, { ...patch, group: item.group, image: item.image });
+        for (const [b, e] of Object.entries(entries)) {
+          const has = out.menus[b].items.some((x) => x.id === existing.id);
+          if (!e) out = has ? setSold(out, b, existing.id, null) : out;
+          else out = has ? updateEntry(out, b, existing.id, { ...e, oldPrice: e.oldPrice, description: e.description }) : setSold(out, b, existing.id, e);
+        }
+        return out;
+      });
     } else {
       const { id: _, ...draft } = item;
       void _;
-      setMenu((m) => addItem(m, draft).menu);
+      const perBranch = Object.fromEntries(Object.entries(entries).filter(([, e]) => e)) as Record<string, NewEntry>;
+      update((d) => addProduct(d, draft, perBranch).data);
     }
-    toast(existing ? 'Yadda saxlanıldı (hələ yayımlanmayıb)' : 'Məhsul əlavə olundu (hələ yayımlanmayıb)');
+    const nowhere = Object.values(entries).every((e) => !e);
+    toast(
+      nowhere
+        ? 'Yadda saxlanıldı. Heç bir filialda satılmır, saytda görünməyəcək.'
+        : existing
+          ? 'Yadda saxlanıldı (hələ yayımlanmayıb)'
+          : 'Məhsul əlavə olundu (hələ yayımlanmayıb)',
+      nowhere ? 'info' : 'ok',
+    );
     onClose();
   };
+
+  /** "Hamısına eyni qiymət": copy this branch's price to every branch and mark them all as selling it. */
+  const sameEverywhere = () => {
+    const src = f.branches[current]?.price.trim() ? f.branches[current] : Object.values(f.branches).find((x) => x.price.trim());
+    if (!src) return toast('Əvvəlcə bir filial üçün qiymət yazın.', 'error');
+    setF((x) => ({
+      ...x,
+      branches: Object.fromEntries(Object.entries(x.branches).map(([b, bf]) => [b, { ...bf, sold: true, price: src.price, oldPrice: src.oldPrice }])),
+    }));
+  };
+  const setB = (b: string, patch: Partial<BranchForm>) => setF((x) => ({ ...x, branches: { ...x.branches, [b]: { ...x.branches[b], ...patch } } }));
 
   const onFile = async (file?: File) => {
     if (!file) return;
@@ -162,12 +230,17 @@ export default function ItemEditor({
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // preview shows the branch the owner is looking at (or the first one that sells it)
+  const pb = f.branches[current]?.sold ? current : (branchIds.find((b) => f.branches[b]?.sold) ?? current);
+  const pf = f.branches[pb];
   const preview = {
+    branch: branchName(data, pb),
     name: f.az || 'Məhsulun adı',
-    desc: f.description,
-    price: parsePrice(f.price),
-    old: f.oldPrice.trim() ? parsePrice(f.oldPrice) : null,
+    desc: pf?.ownDesc ? pf.description : f.description,
+    price: pf ? parsePrice(pf.price) : null,
+    old: pf?.oldPrice.trim() ? parsePrice(pf.oldPrice) : null,
     img: srcFor(f.image),
+    available: pf?.sold ? pf.available : false,
   };
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => ({ ...x, [k]: v }));
 
@@ -192,6 +265,9 @@ export default function ItemEditor({
               }}
               noValidate
             >
+              <p className="rounded-xl bg-white/5 px-3 py-2 text-xs text-mute">
+                Ad, foto, kateqoriya, etiketlər və tərkib <b className="text-cream">{branchIds.length} filialın hamısına aiddir</b>. Qiymətlər aşağıda filial-filial yazılır.
+              </p>
               <Field label="Ad (AZ) *" error={errors.name} htmlFor="f-az">
                 <input id="f-az" ref={firstRef} className={input} value={f.az} aria-invalid={!!errors.name} onChange={(e) => set('az', e.target.value)} placeholder="məs. Çizburger" />
               </Field>
@@ -226,18 +302,9 @@ export default function ItemEditor({
                   </Field>
                 )}
               </div>
-              <Field label="Tərkib" htmlFor="f-desc">
+              <Field label="Tərkib (bütün filiallar)" hint="Bir filialda fərqlidirsə, aşağıda həmin filial üçün ayrıca yazın" htmlFor="f-desc">
                 <textarea id="f-desc" rows={3} className={input} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder="məs. Çəkilmiş mal əti 100 qr, pomidor, pendir" />
               </Field>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Qiymət (₼) *" error={errors.price} htmlFor="f-price">
-                  <input id="f-price" inputMode="decimal" className={input} value={f.price} aria-invalid={!!errors.price} onChange={(e) => set('price', e.target.value)} placeholder="5.80" />
-                </Field>
-                <Field label="Köhnə qiymət (₼)" hint="Endirim üçün. Boş = endirim yoxdur" error={errors.oldPrice} htmlFor="f-old">
-                  <input id="f-old" inputMode="decimal" className={input} value={f.oldPrice} aria-invalid={!!errors.oldPrice} onChange={(e) => set('oldPrice', e.target.value)} placeholder="—" />
-                </Field>
-              </div>
-
               <fieldset>
                 <legend className="mb-1.5 text-sm font-semibold">Etiketlər</legend>
                 <div className="flex flex-wrap gap-2">
@@ -259,13 +326,54 @@ export default function ItemEditor({
                 </div>
               </fieldset>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
-                <div>
-                  <p className="font-semibold">{f.available ? 'Mövcuddur' : 'Bitib'}</p>
-                  <p className="text-xs text-mute">{f.available ? 'Saytda görünür' : 'Saytdan gizlədilib, silinməyib'}</p>
+              <fieldset className="grid gap-3" data-testid="branch-prices">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <legend className="text-sm font-semibold">Filiallar və qiymətlər</legend>
+                  <button type="button" onClick={sameEverywhere} className="text-sm font-bold text-gold hover:underline">
+                    ⇉ Hamısına eyni qiymət
+                  </button>
                 </div>
-                <Switch on={f.available} onChange={(v) => set('available', v)} label="Mövcuddur" size="lg" />
-              </div>
+                {branchIds.map((b) => {
+                  const bf = f.branches[b];
+                  const bn = branchName(data, b);
+                  return (
+                    <div key={b} data-testid={`branch-form-${b}`} className={`rounded-2xl border p-3.5 ${bf.sold ? 'border-white/15 bg-white/[.02]' : 'border-dashed border-white/10'}`}>
+                      <label className="flex items-center justify-between gap-3">
+                        <span className={`font-bold ${b === current ? 'text-gold' : ''}`}>📍 {bn}</span>
+                        <span className="flex items-center gap-2 text-sm text-mute">
+                          {bf.sold ? 'Bu filialda satılır' : 'Satılmır'}
+                          <Switch on={bf.sold} onChange={(v) => setB(b, { sold: v })} label={`${bn}: bu filialda satılır`} />
+                        </span>
+                      </label>
+                      {bf.sold && (
+                        <div className="mt-3 grid gap-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <Field label="Qiymət (₼) *" error={errors[`${b}.price`]} htmlFor={`f-${b}-price`}>
+                              <input id={`f-${b}-price`} inputMode="decimal" className={input} value={bf.price} aria-invalid={!!errors[`${b}.price`]} onChange={(e) => setB(b, { price: e.target.value })} placeholder="5.80" />
+                            </Field>
+                            <Field label="Köhnə qiymət (₼)" hint="Endirim üçün" error={errors[`${b}.oldPrice`]} htmlFor={`f-${b}-old`}>
+                              <input id={`f-${b}-old`} inputMode="decimal" className={input} value={bf.oldPrice} aria-invalid={!!errors[`${b}.oldPrice`]} onChange={(e) => setB(b, { oldPrice: e.target.value })} placeholder="—" />
+                            </Field>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="flex items-center gap-2 text-sm">
+                              <Switch on={bf.available} onChange={(v) => setB(b, { available: v })} label={`${bn}: mövcuddur`} />
+                              {bf.available ? 'Mövcuddur' : <span className="text-[#ff7a70]">Bitib (müvəqqəti gizlədilib)</span>}
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-mute">
+                              <input type="checkbox" className="size-4 accent-[#f29a1f]" checked={bf.ownDesc} onChange={(e) => setB(b, { ownDesc: e.target.checked, description: bf.description || f.description })} />
+                              Bu filialda fərqli tərkib
+                            </label>
+                          </div>
+                          {bf.ownDesc && (
+                            <textarea aria-label={`${bn}: tərkib`} rows={2} className={input} value={bf.description} onChange={(e) => setB(b, { description: e.target.value })} />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </fieldset>
 
               <div>
                 <p className="mb-1.5 text-sm font-semibold">Foto</p>
@@ -319,7 +427,7 @@ export default function ItemEditor({
 
             {/* live preview: how the card looks on the site */}
             <aside aria-label="Önizləmə">
-              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-mute">Saytda belə görünəcək</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-mute">Saytda belə görünəcək · {preview.branch}</p>
               <div className="overflow-hidden rounded-2xl border border-white/5 bg-card">
                 <div className="relative aspect-[4/3] bg-card-2">
                   {preview.img ? (
@@ -332,7 +440,7 @@ export default function ItemEditor({
                   {preview.old && preview.price && preview.old > preview.price && (
                     <span className="absolute left-2 top-2 rounded-full bg-red px-2 py-0.5 text-xs font-extrabold text-white">−{(preview.old - preview.price).toFixed(2)} ₼ qənaət</span>
                   )}
-                  {!f.available && <span className="absolute inset-0 grid place-items-center bg-black/70 font-bold">Bitib · saytda görünmür</span>}
+                  {!preview.available && <span className="absolute inset-0 grid place-items-center bg-black/70 font-bold">Bitib · saytda görünmür</span>}
                 </div>
                 <div className="p-3">
                   <p className="font-bold leading-snug">{preview.name}</p>
@@ -354,13 +462,13 @@ export default function ItemEditor({
           {existing && (
             <>
               <button type="button" onClick={() => onDelete([existing.id])} className={btn.danger}>
-                🗑 Sil
+                🗑 Hər yerdən sil
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  const copy = duplicateItem(menu, existing.id);
-                  setMenu(() => copy.menu);
+                  const copy = duplicateProduct(data, existing.id);
+                  update(() => copy.data);
                   toast('Kopya yaradıldı. İndi onu redaktə edirsiniz.');
                   onOpen(copy.id);
                 }}

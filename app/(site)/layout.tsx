@@ -1,17 +1,13 @@
 import Script from 'next/script';
 import { config } from '@/lib/config';
-import { StoreProvider } from '@/lib/store';
-import JsonLd from '@/components/JsonLd';
 
-// Public site only: the admin panel gets neither the cart store, JSON-LD nor analytics
-// (the owner's own visits would otherwise count in GA4 / Meta Pixel).
+// Public site only: the admin panel gets no analytics (the owner's own visits would otherwise count).
+// Each page brings its own StoreProvider: the brand home page has no branch, branch pages do.
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   const { ga4Id, metaPixelId } = config.analytics;
   return (
     <>
-      <JsonLd />
-      <StoreProvider>{children}</StoreProvider>
-
+      {children}
       {ga4Id && (
         <>
           <Script src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`} strategy="afterInteractive" />

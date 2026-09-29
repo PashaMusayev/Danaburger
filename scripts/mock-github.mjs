@@ -3,12 +3,12 @@
 // E2E tests start it automatically. Nothing here touches the real repository.
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const PORT = Number(process.env.MOCK_PORT || 4010);
 const TOKEN = process.env.MOCK_TOKEN || 'mock-token';
 const BRANCH = process.env.GITHUB_BRANCH || 'main';
-const SEED = ['data/menu.json', 'data/settings.json'];
+const SEED = ['data/menu.json', 'data/settings.json', 'data/branches.json', ...readdirSync('data/branches').map((f) => `data/branches/${f}`)];
 
 let blobs, trees, commits, head;
 
@@ -75,10 +75,10 @@ createServer(async (req, res) => {
   }
   if (p === '/__mock/external-change') {
     // simulate someone else editing the menu (for conflict tests)
-    const f = fileAt(head, 'data/menu.json');
-    const text = f.buf.toString('utf8').replace('"price": 3.5,', '"price": 3.6,');
+    const f = fileAt(head, 'data/branches/gunesli.json');
+    const text = f.buf.toString('utf8').replace('{"id": "merci", "price": 3.5,', '{"id": "merci", "price": 3.6,');
     const entries = new Map(trees.get(commits.get(head).tree));
-    entries.set('data/menu.json', putBlob(Buffer.from(text)));
+    entries.set('data/branches/gunesli.json', putBlob(Buffer.from(text)));
     head = putCommit(putTree([...entries]), [head], 'External edit');
     return send(res, 200, { head });
   }
@@ -139,10 +139,16 @@ createServer(async (req, res) => {
       const path = url.searchParams.get('path');
       const limit = Number(url.searchParams.get('per_page') || 30);
       const out = [];
+      // like GitHub: `path` may be a file or a directory
+      const under = (sha) => {
+        if (!sha) return '';
+        const t = trees.get(commits.get(sha).tree);
+        return JSON.stringify([...t].filter(([p]) => p === path || p.startsWith(path + '/')).sort());
+      };
       for (let s = head; s && out.length < limit; s = commits.get(s).parents[0]) {
         const c = commits.get(s);
-        const mine = fileAt(s, path)?.sha;
-        const parent = c.parents[0] ? fileAt(c.parents[0], path)?.sha : undefined;
+        const mine = under(s);
+        const parent = under(c.parents[0]);
         if (mine !== parent) out.push({ sha: s, commit: { message: c.message, author: { name: c.author, date: c.date } } });
       }
       return send(res, 200, out);

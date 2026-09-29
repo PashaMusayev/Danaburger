@@ -44,7 +44,7 @@ export default function HistoryScreen() {
       title: 'Bu versiyaya qayıdılsın?',
       body: (
         <p>
-          Menyu <b>{when}</b> tarixindəki vəziyyətinə qaytarılacaq və sayt yenilənəcək. Bu da tarixçədə yeni qeyd kimi saxlanılır, istəsəniz yenidən geri qayıda bilərsiniz.
+          Bütün filialların menyuları və qiymətləri <b>{when}</b> tarixindəki vəziyyətinə qaytarılacaq (telefonlar, ünvanlar və ayarlar dəyişmir), sayt yenilənəcək. Bu da tarixçədə yeni qeyd kimi saxlanılır, istəsəniz yenidən geri qayıda bilərsiniz.
         </p>
       ),
       ok: 'Bəli, qaytar',
@@ -52,7 +52,7 @@ export default function HistoryScreen() {
     if (!ok) return;
     setBusy(e.sha);
     try {
-      const r = await api<{ commitSha: string }>('revert', { commitSha: e.sha, baseMenuSha: base.menuSha, date: when });
+      const r = await api<{ commitSha: string }>('revert', { commitSha: e.sha, baseShas: base.shas, date: when });
       toast('Menyu geri qaytarıldı. Sayt ~1 dəqiqəyə yenilənəcək.');
       await afterRevert(r.commitSha);
       await load();
@@ -66,7 +66,7 @@ export default function HistoryScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="font-display text-3xl uppercase">Tarixçə</h1>
-      <p className="mt-1 text-sm text-mute">Menyuda edilən son 30 dəyişiklik. İstənilən versiyaya qayıtmaq olar.</p>
+      <p className="mt-1 text-sm text-mute">Menyularda, qiymətlərdə və ayarlarda edilən son 30 dəyişiklik. İstənilən versiyanın menyularına qayıtmaq olar.</p>
       {changes.length > 0 && (
         <p className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm text-gold">
           Yayımlanmamış {changes.length} dəyişikliyiniz var. Geri qaytarmaq üçün əvvəlcə onları yayımlayın və ya ləğv edin.

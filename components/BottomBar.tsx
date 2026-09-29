@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useStore } from '@/lib/store';
+import { useBranch, useStore } from '@/lib/store';
 import { fmt } from '@/lib/menu';
 import { telHref, whatsappHref } from '@/lib/config';
 import { track } from '@/lib/analytics';
 
 export default function BottomBar() {
   const { t, count, total, setCartOpen, toast } = useStore();
-  const tel = telHref();
+  const { branch } = useBranch();
+  const tel = telHref(branch.phone);
   const [bump, setBump] = useState(false);
   const prev = useRef(count);
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function BottomBar() {
           {tel && (
             <a
               href={tel}
-              onClick={() => track('call_click', { location: 'bottom_bar' })}
+              onClick={() => track('call_click', { location: 'bottom_bar', branch: branch.id })}
               className="flex flex-1 flex-col items-center justify-center rounded-2xl bg-card py-2 text-xs font-bold"
             >
               <span className="text-lg" aria-hidden>📞</span>
@@ -44,16 +45,17 @@ export default function BottomBar() {
             </a>
           )}
           <a
-            href={whatsappHref(t.cart.msgHello)}
+            href={whatsappHref(branch.whatsapp, t.cart.msgHello(branch.name.az))}
             target="_blank"
             rel="noopener"
-            onClick={() => track('whatsapp_click', { location: 'bottom_bar' })}
+            onClick={() => track('whatsapp_click', { location: 'bottom_bar', branch: branch.id })}
             className="flex flex-1 flex-col items-center justify-center rounded-2xl bg-card py-2 text-xs font-bold"
           >
             <span className="text-lg" aria-hidden>💬</span>
             {t.bar.whatsapp}
           </a>
           <button
+            data-testid="cart-button"
             onClick={() => setCartOpen(true)}
             className={`flex flex-[1.6] items-center justify-center gap-2 rounded-2xl bg-red py-2 font-extrabold text-white ${bump ? 'bump' : ''}`}
           >
