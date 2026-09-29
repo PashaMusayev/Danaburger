@@ -113,7 +113,7 @@ Saytda düzəldilmiş forma göstərilir. Çap menyusunda da düzəltmək tövsi
 - **`popular` etiketləri** və pizza/pide fotolarının hansı məhsula aid olduğu təxminidir, restoran təsdiqləməlidir.
 - Instagram, TikTok, Wolt və Bolt linkləri, dəqiq küçə ünvanı.
 
-Təsdiqlənib: "Banka" Coca-Cola 0.33 dəmir bankadır. "Dana/Quzu/Spesial spagetdi" adları menyudakı kimi düzgündür. Dana burger pizza və Pide sucuklu üçün tərkib hələlik boş qalır.
+Təsdiqlənib: "Banka" (Coca-Cola 0.33 dəmir banka) adı menyudakı kimi "Banka" qalır. "Dana/Quzu/Spesial spagetdi" adları menyudakı kimi düzgündür. Dana burger pizza və Pide sucuklu üçün tərkib hələlik boş qalır.
 
 ## Foto mənbəyi
 
