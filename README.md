@@ -108,13 +108,12 @@ Saytda düzəldilmiş forma göstərilir. Çap menyusunda da düzəltmək tövsi
 
 ## Restoranla dəqiqləşdirilməli olanlar
 
-- **Telefon və WhatsApp nömrəsi** (`lib/config.ts`). Nömrə yazılana qədər "Zəng" düyməsi gizlidir, WhatsApp isə müştəridən kontakt seçməsini istəyir.
-- **"Dana spagetdi", "Quzu spagetdi", "Spesial spagetdi"** adları menyuda belə yazılıb. Düzgün yazılışı soruşulmalıdır.
-- **"Banka"** (İçkilər, 3.00 ₼): hansı içkidir?
-- **Dana burger pizza** və **Pide sucuklu** üçün menyuda tərkib yazılmayıb.
-- **Çiken Set:** menyuda eyni adda üçüncü set var (4 çiken, 36.90 ₼). Saytda digərlərindən ayırmaq üçün onu "Çiken Set (4 nəfərlik)" adlandırmışam.
-- **`popular` etiketləri** və pizza/pide fotolarının hansı məhsula aid olduğu mənim təxminimdir. Restoran təsdiqləməlidir.
+- **Telefon və WhatsApp nömrəsi** (`lib/config.ts`): sonra əlavə olunacaq. Nömrə yazılana qədər "Zəng" düyməsi gizlidir, WhatsApp isə müştəridən kontakt seçməsini istəyir.
+- **"Banka"** (İçkilər, 3.00 ₼): içkinin dəqiq adı hələ saytda yazılmayıb.
+- **`popular` etiketləri** və pizza/pide fotolarının hansı məhsula aid olduğu təxminidir, restoran təsdiqləməlidir.
 - Instagram, TikTok, Wolt və Bolt linkləri, dəqiq küçə ünvanı.
+
+Təsdiqlənib: "Dana/Quzu/Spesial spagetdi" adları menyudakı kimi düzgündür. Dana burger pizza və Pide sucuklu üçün tərkib hələlik boş qalır.
 
 ## Foto mənbəyi
 
