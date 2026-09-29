@@ -6,7 +6,7 @@ export const config = {
   city: 'Bakı',
 
   // Saytın son domeni (QR kod, sitemap və SEO üçün). Deploy-dan sonra dəyişin.
-  siteUrl: 'https://dana-burger.vercel.app',
+  siteUrl: 'https://danaburger-ten.vercel.app',
 
   // Beynəlxalq formatda, boşluqsuz: '+994501234567'. Boş olanda "Zəng" düyməsi gizlənir
   // və WhatsApp müştəriyə kontakt seçdirir.
