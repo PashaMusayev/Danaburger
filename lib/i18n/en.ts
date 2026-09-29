@@ -28,7 +28,10 @@ const en: Dict = {
     title: 'Cheaper as a set',
     save: 'saved',
     add: 'Add to cart',
-    all: 'All sets',
+    all: 'See all',
+    less: 'Back to carousel',
+    prev: 'Previous',
+    next: 'Next',
   },
   breakfast: {
     kicker: 'Start the day right',

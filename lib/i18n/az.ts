@@ -26,7 +26,10 @@ const az = {
     title: 'Setlərlə daha ucuz',
     save: 'qənaət',
     add: 'Səbətə at',
-    all: 'Bütün setlər',
+    all: 'Hamısına bax',
+    less: 'Karuselə qayıt',
+    prev: 'Əvvəlki',
+    next: 'Növbəti',
   },
   breakfast: {
     kicker: 'Günə dadlı başla',
