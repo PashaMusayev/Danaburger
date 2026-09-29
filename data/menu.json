@@ -149,7 +149,7 @@
     {"id": "qatiq", "category": "sauces", "name": {"az": "Qatıq", "ru": "Катык", "en": "Qatıq (yogurt)"}, "description": "", "price": 1.2, "tags": [], "available": true},
     {"id": "okroska", "category": "drinks", "name": {"az": "Okroşka", "ru": "Окрошка", "en": "Okroshka"}, "description": "", "price": 1.6, "tags": [], "available": true},
     {"id": "kola-05", "category": "drinks", "name": {"az": "Kola 0.5", "ru": "Кола 0.5", "en": "Cola 0.5"}, "description": "", "price": 2.5, "tags": [], "available": true},
-    {"id": "banka", "category": "drinks", "name": {"az": "Banka", "ru": "Банка", "en": "Can"}, "description": "", "price": 3.0, "tags": [], "available": true},
+    {"id": "banka", "category": "drinks", "name": {"az": "Coca-Cola 0.33 (dəmir banka)", "ru": "Coca-Cola 0,33 (жестяная банка)", "en": "Coca-Cola 0.33 (can)"}, "description": "", "price": 3.0, "tags": [], "available": true},
     {"id": "kola-03", "category": "drinks", "name": {"az": "Kola 0.3", "ru": "Кола 0.3", "en": "Cola 0.3"}, "description": "", "price": 1.8, "tags": [], "available": true},
     {"id": "ayran", "category": "drinks", "name": {"az": "Ayran", "ru": "Айран", "en": "Ayran"}, "description": "", "price": 1.4, "tags": [], "available": true},
     {"id": "cappy-05", "category": "drinks", "name": {"az": "Cappy 0.5", "ru": "Cappy 0.5", "en": "Cappy 0.5"}, "description": "", "price": 3.0, "tags": [], "available": true},
