@@ -5,6 +5,9 @@ import OpenBadge from '@/components/OpenBadge';
 import BottomBar from '@/components/BottomBar';
 import Sheets from '@/components/LazySheets';
 
+// Public pages are built once per deploy; the admin panel triggers a new deploy on publish.
+export const dynamic = 'force-static';
+
 export const metadata: Metadata = {
   title: 'Menyu — Dana Burger',
   description: 'Dana Burger menyusu: burgerlər, şaurma, izqara, pizza, pide, setlər və içkilər. Qiymətlər AZN ilə.',

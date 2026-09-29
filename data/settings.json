@@ -1,0 +1,17 @@
+{
+  "phone": "",
+  "whatsapp": "",
+  "social": {
+    "instagram": "",
+    "tiktok": "",
+    "facebook": ""
+  },
+  "delivery": {
+    "wolt": "",
+    "bolt": ""
+  },
+  "analytics": {
+    "ga4Id": "",
+    "metaPixelId": ""
+  }
+}

@@ -6,7 +6,12 @@ const FOOD = new Set(['burgers', 'signature', 'shawarma', 'grill', 'pizza', 'pid
 const DRINK = new Set(['drinks', 'coffee', 'fresh']);
 const MEALS = new Set(['sets', 'combos', 'breakfast']);
 
-const combos = items.filter((i) => i.includes?.length);
+// Only offer a combo when every slot can still be filled from what's on sale
+// (a component may be marked "bitib" or deleted in the admin panel).
+const combos = items
+  .filter((i) => i.includes?.length)
+  .map((c) => ({ ...c, includes: c.includes!.map((s) => ({ ...s, anyOf: s.anyOf.filter((id) => itemById.has(id)) })) }))
+  .filter((c) => c.includes.every((s) => s.anyOf.length > 0));
 
 export const lineTotal = (l: CartLine) => (itemById.get(l.id)?.price ?? 0) * l.qty;
 export const cartTotal = (cart: CartLine[]) => cart.reduce((s, l) => s + lineTotal(l), 0);

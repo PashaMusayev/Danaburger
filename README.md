@@ -2,23 +2,30 @@
 
 Bakıdakı **Dana Burger** restoranı üçün mobil-first sayt: interaktiv menyu, WhatsApp ilə sifariş, setlərə keçid təklifi (upsell), canlı "Açıqdır/Bağlıdır" statusu və masalar üçün QR menyu.
 
-**Stack:** Next.js 16 (App Router, statik export) · TypeScript · Tailwind CSS 4. Server və verilənlər bazası lazım deyil, Vercel-də pulsuz işləyir.
+**Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS 4, Vercel-də pulsuz işləyir. İctimai səhifələr (`/`, `/menu`) build zamanı statik yaradılır. Yalnız admin panel (`/admin`) serverdə işləyir. Verilənlər bazası yoxdur.
+
+**Admin panel:** `/admin/`. Sahib menyunu, qiymətləri, fotoları və əlaqə məlumatlarını koda toxunmadan dəyişir. İstifadə və qurulma üçün **[ADMIN.md](ADMIN.md)**-yə baxın.
 
 ## Tez başlanğıc
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm run build    # statik sayt `out/` qovluğuna yığılır
-npm start        # `out/`-u lokal göstərir (sıxılma ilə)
+npm run dev        # http://localhost:3000
+npm run build      # istehsal build-i
+npm start          # build-i lokal işə salır
+npm run test:unit  # unit testlər
+npm run test:e2e   # Playwright e2e (əvvəlcə `npm run build`)
 ```
 
 ## Ən çox dəyişəcəyiniz fayllar
 
-| Nə dəyişir | Fayl |
-|---|---|
-| Qiymət, məhsul, tərkib, foto, endirim | `data/menu.json` |
-| Telefon, WhatsApp, Instagram, Wolt/Bolt, domen, GA4/Pixel ID | `lib/config.ts` |
+Qiymət, məhsul və əlaqə məlumatlarını **admin paneldən** dəyişmək ən rahat yoldur. Fayllar isə bunlardır:
+
+| Nə dəyişir | Fayl | Admin paneldə |
+|---|---|---|
+| Qiymət, məhsul, tərkib, foto, endirim, "bitib" | `data/menu.json` | Menyu |
+| Telefon, WhatsApp, Instagram, Wolt/Bolt, GA4/Pixel ID | `data/settings.json` | Ayarlar |
+| Domen, ünvan, iş saatları | `lib/config.ts` | — |
 | Saytdakı mətnlər (AZ / RU / EN) | `lib/i18n/az.ts`, `ru.ts`, `en.ts` |
 
 ### Menyunu redaktə etmək
@@ -51,13 +58,14 @@ Dəyişiklikdən sonra `git push` edin, Vercel saytı avtomatik yeniləyəcək.
   - Səbətdə yemək olub içki yoxdursa, içki təklif olunur. Sous yoxdursa, sous təklif olunur.
 - **QR kod:** footer-dədir, build zamanı `/menu/` səhifəsi üçün yaradılır və SVG kimi yüklənə bilir. `/menu/` səhifəsi masalar üçündür və birbaşa menyunu açır.
 - **SEO:** `schema.org/Restaurant` + tam `Menu` JSON-LD, OpenGraph şəkli (`public/og.jpg`), `sitemap.xml`, `robots.txt`.
-- **Analitika:** `lib/config.ts`-də ID yazılanda GA4 və Meta Pixel avtomatik qoşulur. İzlənən eventlər:
+- **Analitika:** ID-lər admin panelin Ayarlar bölməsində (`data/settings.json`) yazılanda GA4 və Meta Pixel avtomatik qoşulur. Admin səhifələrinə bu skriptlər yüklənmir. İzlənən eventlər:
   `call_click`, `whatsapp_click`, `whatsapp_order` (məbləğ ilə), `directions_click`, `add_to_cart`, `combo_upsell`, `delivery_click`.
 
 ## Deploy (Vercel)
 
 1. [vercel.com](https://vercel.com)-da GitHub ilə daxil olun, **Add New → Project** seçin və bu repozitoriyanı seçin.
 2. Heç bir ayarı dəyişmədən **Deploy** basın. Framework avtomatik tanınır.
+   Admin panel üçün env dəyişənləri lazımdır, onlar [ADMIN.md → Qurulma](ADMIN.md#qurulma-developer-üçün) bölməsindədir.
 3. Domen alındıqdan sonra onu **Settings → Domains** bölməsində əlavə edin və `lib/config.ts`-də `siteUrl`-i yeniləyin. QR kod, sitemap və SEO bu dəyəri istifadə edir.
 
 ## Şriftlər
@@ -108,7 +116,7 @@ Saytda düzəldilmiş forma göstərilir. Çap menyusunda da düzəltmək tövsi
 
 ## Restoranla dəqiqləşdirilməli olanlar
 
-- **Telefon və WhatsApp nömrəsi** (`lib/config.ts`): sonra əlavə olunacaq. Nömrə yazılana qədər "Zəng" düyməsi gizlidir, WhatsApp isə müştəridən kontakt seçməsini istəyir.
+- **Telefon və WhatsApp nömrəsi**: sonra admin paneldən (Ayarlar) əlavə olunacaq. Nömrə yazılana qədər "Zəng" düyməsi gizlidir, WhatsApp isə müştəridən kontakt seçməsini istəyir.
 - **Fotosu olmayan setlər** (məs. İstanbul Set): fotolar restoran sahibindən alınacaq. Hazır olanda `public/img/`-ə qoyub `menu.json`-da `image` sahəsini yazmaq kifayətdir.
 - **`popular` etiketləri** və pizza/pide fotolarının hansı məhsula aid olduğu təxminidir, restoran təsdiqləməlidir.
 - Instagram, TikTok, Wolt və Bolt linkləri, dəqiq küçə ünvanı.

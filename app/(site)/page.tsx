@@ -11,6 +11,9 @@ import BottomBar from '@/components/BottomBar';
 import Sheets from '@/components/LazySheets';
 import { menuQrSvg } from '@/lib/qr';
 
+// Public pages are built once per deploy; the admin panel triggers a new deploy on publish.
+export const dynamic = 'force-static';
+
 export default async function Home() {
   const qr = await menuQrSvg();
   return (

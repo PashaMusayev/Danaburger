@@ -1,5 +1,9 @@
-// Restoranın bütün əlaqə və biznes məlumatları buradadır.
-// Nömrə və ya link dəyişəndə yalnız bu faylı redaktə edin.
+// Restoranın biznes məlumatları.
+// Telefon, WhatsApp, sosial linklər və analitika ID-ləri `data/settings.json`-dadır:
+// onları admin paneldən (/admin → Ayarlar) dəyişin.
+import settings from '@/data/settings.json';
+
+export type Settings = typeof settings;
 
 export const config = {
   name: 'Dana Burger',
@@ -8,10 +12,9 @@ export const config = {
   // Saytın son domeni (QR kod, sitemap və SEO üçün). Deploy-dan sonra dəyişin.
   siteUrl: 'https://danaburger-ten.vercel.app',
 
-  // Beynəlxalq formatda, boşluqsuz: '+994501234567'. Boş olanda "Zəng" düyməsi gizlənir
-  // və WhatsApp müştəriyə kontakt seçdirir.
-  phone: '',
-  whatsapp: '',
+  // '+994XXXXXXXXX'. Boş olanda "Zəng" düyməsi gizlənir və WhatsApp müştəriyə kontakt seçdirir.
+  phone: settings.phone,
+  whatsapp: settings.whatsapp,
 
   geo: { lat: 40.374861, lng: 49.977472 },
   address: {
@@ -23,21 +26,10 @@ export const config = {
   // Gecə yarısını keçən iş saatları: 11:00 → ertəsi gün 05:00
   hours: { open: '11:00', close: '05:00', timeZone: 'Asia/Baku' },
 
-  social: {
-    instagram: '',
-    tiktok: '',
-    facebook: '',
-  },
-  delivery: {
-    wolt: '',
-    bolt: '',
-  },
-
-  analytics: {
-    // Məs. 'G-XXXXXXXXXX' və '1234567890'. Boş olanda skriptlər yüklənmir.
-    ga4Id: '',
-    metaPixelId: '',
-  },
+  social: settings.social,
+  delivery: settings.delivery,
+  // Boş olanda GA4 / Meta Pixel skriptləri yüklənmir.
+  analytics: settings.analytics,
 };
 
 export const telHref = () => (config.phone ? `tel:${config.phone}` : null);
